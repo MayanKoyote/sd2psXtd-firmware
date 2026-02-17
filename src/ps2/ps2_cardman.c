@@ -87,6 +87,9 @@ static void set_default_card() {
     card_chan = settings_get_ps2_channel();
     cardman_state = PS2_CM_STATE_NORMAL;
     snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
+    uint8_t max_chan = card_config_get_max_channels(folder_name, folder_name);
+    if (card_chan > max_chan)
+        card_chan = max_chan;
 }
 
 static bool try_set_game_id_card() {
@@ -649,7 +652,7 @@ void ps2_cardman_next_channel(void) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
     card_chan += 1;
     if (card_chan > max_chan)
-        card_chan = CHAN_MIN;
+        card_chan = max_chan; //dont jump to CHAN_MIN. Otherwise without display, you cant see where you actually are.
     needs_update = true;
 }
 
@@ -657,7 +660,7 @@ void ps2_cardman_prev_channel(void) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
     card_chan -= 1;
     if (card_chan < CHAN_MIN)
-        card_chan = max_chan;
+        card_chan = CHAN_MIN; //dont jump to max_chan. Otherwise without display, you cant see where you actually are.
     needs_update = true;
 }
 
@@ -695,6 +698,12 @@ void ps2_cardman_next_idx(void) {
             card_chan = CHAN_MIN;
             if (card_idx > UINT16_MAX)
                 card_idx = UINT16_MAX;
+            uint8_t maxcards = settings_get_ps2_maxcardidx();
+            if (maxcards != 0) //0 = unlimited cards UINT16_MAX
+            {
+                if (card_idx > maxcards)
+                    card_idx = maxcards;
+            }
             snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
             break;
     }

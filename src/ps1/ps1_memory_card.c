@@ -353,6 +353,7 @@ static void mc_read_controller(void) {
     static uint8_t prevCommand = 0;
     uint8_t controller_in[2];
     uint8_t _ = 0x00;
+
     receiveOrNextCmd(&_);
     if (_ == (uint8_t)'B') {    // Only reactive to "read buttons" command
         receiveOrNextCntrl(&_); // Hi-Z
@@ -456,7 +457,7 @@ static void __time_critical_func(mc_main_loop)(void) {
                 case 'W': mc_cmd_write(); break;
                 default: DPRINTF("Unknown command: 0x%.02x\n", ch); break;
             }
-        } else if (0x01 == ch) {
+        } else if ((0x01 == ch) && (settings_get_ps1_controllercombo())) {
             mc_read_controller();
         } else if ((0x21 == ch) && !ps2_multitap) {
             ps1_mc_respond(0x00);

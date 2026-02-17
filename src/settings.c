@@ -30,6 +30,8 @@ typedef struct {
     uint8_t ps2_cardsize;
     // TODO: how do we store last used channel for cards that use autodetecting w/ gameid?
     uint8_t ps2_variant; // Variant for keys
+    uint8_t ps1_maxcardidx;    //1-255
+    uint8_t ps2_maxcardidx    //1-255
 } settings_t;
 
 typedef struct {
@@ -38,19 +40,22 @@ typedef struct {
     uint8_t sys_flags;
     uint8_t ps2_cardsize;
     uint8_t ps2_variant; // Variant for keys
+    uint8_t ps1_maxcardidx;
+    uint8_t ps2_maxcardidx;
 } serialized_settings_t;
 
 #define SETTINGS_UPDATE_FIELD(field) settings_update_part(&settings.field, sizeof(settings.field))
 
-#define SETTINGS_VERSION_MAGIC              (0xAACD0006)
+#define SETTINGS_VERSION_MAGIC              (0xAACD0007)
 #define SETTINGS_PS1_FLAGS_AUTOBOOT         (0b0000001)
 #define SETTINGS_PS1_FLAGS_GAME_ID          (0b0000010)
+#define SETTINGS_PS1_FLAGS_CTRL_COMBO       (0b0000100)
 #define SETTINGS_PS2_FLAGS_AUTOBOOT         (0b0000001)
 #define SETTINGS_PS2_FLAGS_GAME_ID          (0b0000010)
 #define SETTINGS_SYS_FLAGS_PS2_MODE         (0b0000001)
 #define SETTINGS_SYS_FLAGS_FLIPPED_DISPLAY  (0b0000010)
 
-_Static_assert(sizeof(settings_t) == 20, "unexpected padding in the settings structure");
+_Static_assert(sizeof(settings_t) == 24, "unexpected padding in the settings structure");
 
 static settings_t settings;
 static serialized_settings_t serialized_settings;
@@ -71,12 +76,21 @@ static int parse_card_configuration(void *user, const char *section, const char 
     } else if (MATCH("PS1", "GameID")
         && DIFFERS(value, ((_s->ps1_flags & SETTINGS_PS1_FLAGS_GAME_ID) > 0))) {
         _s->ps1_flags ^= SETTINGS_PS1_FLAGS_GAME_ID;
+    } else if (MATCH("PS1", "EnableControllerCombo")
+        && DIFFERS(value, ((_s->ps1_flags & SETTINGS_PS1_FLAGS_CTRL_COMBO) > 0))) {
+        _s->ps1_flags ^= SETTINGS_PS1_FLAGS_CTRL_COMBO;
+    } else if (MATCH("PS1", "MaxCardIdx")) {
+         int maxcard = atoi(value);
+         _s->ps1_maxcardidx = maxcard;
+    } else if (MATCH("PS2", "MaxCardIdx")) {
+         int maxcard = atoi(value);
+         _s->ps2_maxcardidx = maxcard;
     } else if (MATCH("PS2", "Autoboot")
         && DIFFERS(value, ((_s->ps2_flags & SETTINGS_PS2_FLAGS_AUTOBOOT) > 0))) {
         _s->ps2_flags ^= SETTINGS_PS2_FLAGS_AUTOBOOT;
     } else if (MATCH("PS2", "GameID")
         && DIFFERS(value, ((_s->ps2_flags & SETTINGS_PS2_FLAGS_GAME_ID) > 0))) {
-        _s->ps1_flags ^= SETTINGS_PS2_FLAGS_GAME_ID;
+        _s->ps2_flags ^= SETTINGS_PS2_FLAGS_GAME_ID;
     } else if (MATCH("PS2", "CardSize")) {
         int size = atoi(value);
         switch (size) {
@@ -121,18 +135,22 @@ static void settings_deserialize(void) {
                                              .sys_flags = settings.sys_flags,
                                              .ps2_cardsize = settings.ps2_cardsize,
                                              .ps2_variant = settings.ps2_variant,
-                                             .ps1_flags = settings.ps1_flags};
+                                             .ps1_flags = settings.ps1_flags,
+                                             .ps1_maxcardidx = settings.ps1_maxcardidx,
+                                             .ps2_maxcardidx = settings.ps2_maxcardidx};
         serialized_settings = newSettings;
         ini_parse_sd_file(fd, parse_card_configuration, &newSettings);
         sd_close(fd);
         if (memcmp(&newSettings, &serialized_settings, sizeof(serialized_settings))) {
             printf("Updating settings from ini\n");
-            serialized_settings = newSettings;
+            serialized_settings      = newSettings;
             settings.sys_flags       = newSettings.sys_flags;
             settings.ps2_flags       = newSettings.ps2_flags;
             settings.ps2_cardsize    = newSettings.ps2_cardsize;
             settings.ps2_variant     = newSettings.ps2_variant;
             settings.ps1_flags       = newSettings.ps1_flags;
+            settings.ps1_maxcardidx  = newSettings.ps1_maxcardidx;
+            settings.ps2_maxcardidx  = newSettings.ps2_maxcardidx;
 
             wear_leveling_write(0, &settings, sizeof(settings));
         }
@@ -142,7 +160,9 @@ static void settings_deserialize(void) {
 static void settings_serialize(void) {
     int fd;
     // Only serialize if required
-    if (serialized_settings.ps2_cardsize == settings.ps2_cardsize &&
+    if (serialized_settings.ps1_maxcardidx == settings.ps1_maxcardidx &&
+        serialized_settings.ps2_maxcardidx == settings.ps2_maxcardidx &&
+        serialized_settings.ps2_cardsize == settings.ps2_cardsize &&
         serialized_settings.ps2_flags == settings.ps2_flags &&
         serialized_settings.sys_flags == settings.sys_flags &&
         serialized_settings.ps2_variant == settings.ps2_variant &&
@@ -170,8 +190,12 @@ static void settings_serialize(void) {
         sd_write(fd, line_buffer, written);
         written = snprintf(line_buffer, 256, "GameID=%s\n", ((settings.ps1_flags & SETTINGS_PS1_FLAGS_GAME_ID) > 0) ? "ON" : "OFF");
         sd_write(fd, line_buffer, written);
-        written = snprintf(line_buffer, 256, "[PS2]\n");
+        written = snprintf(line_buffer, 256, "EnableControllerCombo=%s\n", ((settings.ps1_flags & SETTINGS_PS1_FLAGS_CTRL_COMBO) > 0) ? "ON" : "OFF");
         sd_write(fd, line_buffer, written);
+        written = snprintf(line_buffer, 256, "MaxCardIdx=%u\n", settings.ps1_maxcardidx);
+        sd_write(fd, line_buffer, written);
+        written = snprintf(line_buffer, 256, "[PS2]\n");
+        sd_write(fd, line_buffer, written);       
         written = snprintf(line_buffer, 256, "Autoboot=%s\n", ((settings.ps2_flags & SETTINGS_PS2_FLAGS_AUTOBOOT) > 0) ? "ON" : "OFF");
         sd_write(fd, line_buffer, written);
         written = snprintf(line_buffer, 256, "GameID=%s\n", ((settings.ps2_flags & SETTINGS_PS2_FLAGS_GAME_ID) > 0) ? "ON" : "OFF");
@@ -195,6 +219,8 @@ static void settings_serialize(void) {
 
         }
         sd_write(fd, line_buffer, written);
+        written = snprintf(line_buffer, 256, "MaxCardIdx=%u\n", settings.ps2_maxcardidx);
+        sd_write(fd, line_buffer, written);
 
         sd_close(fd);
     }
@@ -203,6 +229,8 @@ static void settings_serialize(void) {
     serialized_settings.ps2_cardsize    = settings.ps2_cardsize;
     serialized_settings.ps2_variant     = settings.ps2_variant;
     serialized_settings.ps1_flags       = settings.ps1_flags;
+    serialized_settings.ps1_maxcardidx  = settings.ps1_maxcardidx;
+    serialized_settings.ps2_maxcardidx  = settings.ps2_maxcardidx;
 }
 
 static void settings_reset(void) {
@@ -211,10 +239,12 @@ static void settings_reset(void) {
     settings.display_timeout = 0; // off
     settings.display_contrast = 255; // 100%
     settings.display_vcomh = 0x30; // 0.83 x VCC
-    settings.ps1_flags = SETTINGS_PS1_FLAGS_GAME_ID;
+    settings.ps1_flags = SETTINGS_PS1_FLAGS_GAME_ID | SETTINGS_PS1_FLAGS_CTRL_COMBO;
     settings.ps2_flags = SETTINGS_PS2_FLAGS_GAME_ID;
     settings.ps2_cardsize = 8;
     settings.ps2_variant = PS2_VARIANT_RETAIL;
+    settings.ps1_maxcardidx = 0; //unlimited UINT16_MAX
+    settings.ps2_maxcardidx = 0;
     if (wear_leveling_write(0, &settings, sizeof(settings)) == WEAR_LEVELING_FAILED)
         fatal(ERR_SETTINGS, "failed to reset settings");
 }
@@ -261,6 +291,8 @@ static void settings_update_part(void *settings_ptr, uint32_t sz) {
 int settings_get_ps2_card(void) {
     if (settings.ps2_card < IDX_MIN)
         return IDX_MIN;
+    else if (settings.ps2_card > settings.ps2_maxcardidx)
+        return settings.ps2_maxcardidx;
     return settings.ps2_card;
 }
 
@@ -282,6 +314,14 @@ uint8_t settings_get_ps2_cardsize(void) {
 
 int settings_get_ps2_variant(void) {
     return settings.ps2_variant;
+}
+
+uint8_t settings_get_ps1_maxcardidx(void) {
+    return settings.ps1_maxcardidx;
+}
+
+uint8_t settings_get_ps2_maxcardidx(void) {
+    return settings.ps2_maxcardidx;
 }
 
 void settings_set_ps2_card(int card) {
@@ -319,10 +359,25 @@ void settings_set_ps2_variant(int x) {
     }
 }
 
+void settings_set_ps1_maxcardidx(uint8_t x) {
+    if (settings.ps1_maxcardidx != x) {
+        settings.ps1_maxcardidx = x;
+        SETTINGS_UPDATE_FIELD(ps1_maxcardidx);
+    }
+}
+
+void settings_set_ps2_maxcardidx(uint8_t x) {
+    if (settings.ps2_maxcardidx != x) {
+        settings.ps2_maxcardidx = x;
+        SETTINGS_UPDATE_FIELD(ps2_maxcardidx);
+    }
+}
 
 int settings_get_ps1_card(void) {
     if (settings.ps1_card < IDX_MIN)
         return IDX_MIN;
+    else if (settings.ps1_card > settings.ps1_maxcardidx)
+        return settings.ps1_maxcardidx;
     return settings.ps1_card;
 }
 
@@ -401,6 +456,16 @@ bool settings_get_ps1_game_id(void) {
 void settings_set_ps1_game_id(bool enabled) {
     if (enabled != settings_get_ps1_game_id())
         settings.ps1_flags ^= SETTINGS_PS1_FLAGS_GAME_ID;
+    SETTINGS_UPDATE_FIELD(ps1_flags);
+}
+
+bool settings_get_ps1_controllercombo(void) {
+    return (settings.ps1_flags & SETTINGS_PS1_FLAGS_CTRL_COMBO);
+}
+
+void settings_set_ps1_controllercombo(bool controllercombo) {
+    if (controllercombo != settings_get_ps1_controllercombo())
+        settings.ps1_flags ^= SETTINGS_PS1_FLAGS_CTRL_COMBO;
     SETTINGS_UPDATE_FIELD(ps1_flags);
 }
 

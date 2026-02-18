@@ -109,6 +109,8 @@ The following button combinations are used to perform card and channel switches:
 
 These mappings require that all four buttons (L1, R1, L2, R2) are held down in combination with one of the directional inputs.
 
+The Controller Combos can be activated by a setting in the PS1 Settings menu.
+
 ## PS1: Super fast FreePSXBoot
 
 *sd2psXtd* allows super fast booting of FreePSXBoot by using some non standard card communication.
@@ -132,11 +134,14 @@ FlippedScreen=OFF
 [PS1]
 Autoboot=ON
 GameID=ON
+EnableControllerCombo=ON
+MaxCardIdx=0
 [PS2]
 Autoboot=ON
 GameID=ON
 CardSize=16
 Variant=RETAIL
+MaxCardIdx=0
 ```
 
 Possible values are:
@@ -149,6 +154,8 @@ Possible values are:
 | CardSize      | `1`, `2`, `4`, `8`, `16`, `32`, `64`  |
 | Variant       | `RETAIL`, `PROTO`, `ARCADE`, `ARCADE2`|
 | FlippedScreen | `ON`, `OFF`                           |
+| EnableControllerCombo | `ON`, `OFF`                   |
+| MaxCardIdx    | UINT8                                 |
 
 *Note: Make sure there is an empty line at the end of the ini file.*
 

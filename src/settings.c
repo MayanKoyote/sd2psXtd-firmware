@@ -31,7 +31,7 @@ typedef struct {
     // TODO: how do we store last used channel for cards that use autodetecting w/ gameid?
     uint8_t ps2_variant; // Variant for keys
     uint8_t ps1_maxcardidx;    //1-255
-    uint8_t ps2_maxcardidx    //1-255
+    uint8_t ps2_maxcardidx;    //1-255
 } settings_t;
 
 typedef struct {
@@ -81,10 +81,12 @@ static int parse_card_configuration(void *user, const char *section, const char 
         _s->ps1_flags ^= SETTINGS_PS1_FLAGS_CTRL_COMBO;
     } else if (MATCH("PS1", "MaxCardIdx")) {
          int maxcard = atoi(value);
-         _s->ps1_maxcardidx = maxcard;
+         if (maxcard > 0)
+             _s->ps1_maxcardidx = maxcard;
     } else if (MATCH("PS2", "MaxCardIdx")) {
          int maxcard = atoi(value);
-         _s->ps2_maxcardidx = maxcard;
+         if (maxcard > 0)
+            _s->ps2_maxcardidx = maxcard;
     } else if (MATCH("PS2", "Autoboot")
         && DIFFERS(value, ((_s->ps2_flags & SETTINGS_PS2_FLAGS_AUTOBOOT) > 0))) {
         _s->ps2_flags ^= SETTINGS_PS2_FLAGS_AUTOBOOT;
@@ -195,7 +197,7 @@ static void settings_serialize(void) {
         written = snprintf(line_buffer, 256, "MaxCardIdx=%u\n", settings.ps1_maxcardidx);
         sd_write(fd, line_buffer, written);
         written = snprintf(line_buffer, 256, "[PS2]\n");
-        sd_write(fd, line_buffer, written);       
+        sd_write(fd, line_buffer, written);
         written = snprintf(line_buffer, 256, "Autoboot=%s\n", ((settings.ps2_flags & SETTINGS_PS2_FLAGS_AUTOBOOT) > 0) ? "ON" : "OFF");
         sd_write(fd, line_buffer, written);
         written = snprintf(line_buffer, 256, "GameID=%s\n", ((settings.ps2_flags & SETTINGS_PS2_FLAGS_GAME_ID) > 0) ? "ON" : "OFF");
@@ -291,7 +293,7 @@ static void settings_update_part(void *settings_ptr, uint32_t sz) {
 int settings_get_ps2_card(void) {
     if (settings.ps2_card < IDX_MIN)
         return IDX_MIN;
-    else if (settings.ps2_card > settings.ps2_maxcardidx)
+    else if ((settings.ps2_card > settings.ps2_maxcardidx) && (settings.ps2_maxcardidx > 0))
         return settings.ps2_maxcardidx;
     return settings.ps2_card;
 }
@@ -376,7 +378,7 @@ void settings_set_ps2_maxcardidx(uint8_t x) {
 int settings_get_ps1_card(void) {
     if (settings.ps1_card < IDX_MIN)
         return IDX_MIN;
-    else if (settings.ps1_card > settings.ps1_maxcardidx)
+    else if ((settings.ps1_card > settings.ps1_maxcardidx) && (settings.ps1_maxcardidx > 0))
         return settings.ps1_maxcardidx;
     return settings.ps1_card;
 }

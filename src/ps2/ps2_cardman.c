@@ -652,7 +652,11 @@ void ps2_cardman_next_channel(void) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
     card_chan += 1;
     if (card_chan > max_chan)
+#if WITH_GUI
+        card_chan = CHAN_MIN;
+#else
         card_chan = max_chan; //dont jump to CHAN_MIN. Otherwise without display, you cant see where you actually are.
+#endif
     needs_update = true;
 }
 
@@ -660,7 +664,11 @@ void ps2_cardman_prev_channel(void) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
     card_chan -= 1;
     if (card_chan < CHAN_MIN)
+#if WITH_GUI
+        card_chan = max_chan;
+#else
         card_chan = CHAN_MIN; //dont jump to max_chan. Otherwise without display, you cant see where you actually are.
+#endif
     needs_update = true;
 }
 

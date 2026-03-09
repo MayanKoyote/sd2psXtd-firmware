@@ -49,8 +49,8 @@ static lv_obj_t *g_navbar, *g_progress_bar, *g_progress_text, *g_activity_frame;
 static lv_obj_t *scr_switch_nag, *scr_card_switch, *scr_main, *scr_splash, *scr_menu, *menu, *main_page, *main_header;
 static lv_style_t style_inv, src_main_label_style;
 static lv_anim_t src_main_animation_template;
-static lv_obj_t *scr_main_idx_lbl, *scr_main_channel_lbl, *src_main_title_lbl, *lbl_channel, *lbl_ps1_autoboot, *lbl_ps1_game_id, *lbl_ps2_autoboot,
-    *lbl_ps2_cardsize, *lbl_ps2_variant, *lbl_ps2_game_id, *lbl_civ_err, *auto_off_lbl, *contrast_lbl, *vcomh_lbl, *lbl_mode, *lbl_scrn_flip;
+static lv_obj_t *scr_main_idx_lbl, *scr_main_channel_lbl, *src_main_title_lbl, *lbl_channel, *lbl_ps1_autoboot, *lbl_ps1_game_id, *lbl_ps1_controllercombo,
+    *lbl_ps2_autoboot, *lbl_ps2_cardsize, *lbl_ps2_variant, *lbl_ps2_game_id, *lbl_civ_err, *auto_off_lbl, *contrast_lbl, *vcomh_lbl, *lbl_mode, *lbl_scrn_flip;
 
 static struct {
     uint8_t value;
@@ -489,6 +489,13 @@ static void evt_ps1_gameid(lv_event_t *event) {
     lv_event_stop_bubbling(event);
 }
 
+static void evt_ps1_controllercombo(lv_event_t *event) {
+    bool current = settings_get_ps1_controllercombo();
+    settings_set_ps1_controllercombo(!current);
+    lv_label_set_text(lbl_ps1_controllercombo, !current ? "Yes" : "No");
+    lv_event_stop_bubbling(event);
+}
+
 static void evt_ps2_autoboot(lv_event_t *event) {
     bool current = settings_get_ps2_autoboot();
     settings_set_ps2_autoboot(!current);
@@ -851,6 +858,11 @@ static void create_menu_screen(void) {
         ui_label_create_grow_scroll(cont, "Game ID");
         lbl_ps1_game_id = ui_label_create(cont, settings_get_ps1_game_id() ? " Yes" : " No");
         lv_obj_add_event_cb(cont, evt_ps1_gameid, LV_EVENT_CLICKED, NULL);
+
+        cont = ui_menu_cont_create_nav(ps1_page);
+        ui_label_create_grow_scroll(cont, "Combos");
+        lbl_ps1_controllercombo = ui_label_create(cont, settings_get_ps1_controllercombo() ? " Yes" : " No");
+        lv_obj_add_event_cb(cont, evt_ps1_controllercombo, LV_EVENT_CLICKED, NULL);
     }
 
     /* ps2 */

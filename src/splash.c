@@ -146,27 +146,6 @@ uint8_t splash_img[1032] = {
 bool splash_game_image_available = false;
 bool custom_boot_splash_available = false;
 
-void splash_init(void) {
-    if (((uint8_t*)FLASH_OFF_SPLASH + XIP_BASE)[sizeof(splash_img)] == 0x00) {
-        // If the splash image is not set, copy the default image
-        memcpy(splash_img, (void *)FLASH_OFF_SPLASH + XIP_BASE, sizeof(splash_img));
-        custom_boot_splash_available = true;
-
-    } else if (flash_capacity > FLASH_OFF_SPLASH_LEGACY
-            && ((uint8_t*)FLASH_OFF_SPLASH_LEGACY + XIP_BASE)[sizeof(splash_img)] == 0x00) {
-        // If the splash image is not set, copy the default image from 8MB offset
-        memcpy(splash_img, (void *)FLASH_OFF_SPLASH_LEGACY + XIP_BASE, sizeof(splash_img));
-        custom_boot_splash_available = true;
-    } else {
-        splash_load_sd();
-    }
-}
-
-void splash_update_current(const char* card_folder, const char* card_base, int chan_idx) {
-    splash_game_image_available = card_config_read_image(splash_img, card_folder, card_base, chan_idx);
-}
-
-
 static void __not_in_flash_func(splash_deploy)(uint8_t* buff, size_t size) {
     if (multicore_lockout_victim_is_initialized(1))
         multicore_lockout_start_blocking();
@@ -176,18 +155,32 @@ static void __not_in_flash_func(splash_deploy)(uint8_t* buff, size_t size) {
         multicore_lockout_end_blocking();
 }
 
-bool splash_load_sd(void) {
-    bool ret = false;
-    if (sd_exists("splash.bin")) {
+void splash_init(void) {
+    if (sd_exists("splash.bin")){
         int fd = sd_open("splash.bin", O_RDONLY);
         uint8_t buff[sizeof(splash_img) + 1];
         sd_read(fd, (void *)buff, sizeof(splash_img));
         sd_close(fd);
         splash_deploy(buff, sizeof(buff));
         memcpy(splash_img, buff, sizeof(splash_img));
-        //sd_remove("splash.bin");
+        sd_remove("splash.bin");
         DPRINTF("Splash image loaded from SD card.\n");
-        ret = true;
+        custom_boot_splash_available = true;
+    } else if (((uint8_t*)FLASH_OFF_SPLASH + XIP_BASE)[sizeof(splash_img)] == 0x00) {
+        // If the splash image is not set, copy the default image
+        memcpy(splash_img, (void *)FLASH_OFF_SPLASH + XIP_BASE, sizeof(splash_img));
+        custom_boot_splash_available = true;
+
+    } else if (flash_capacity > FLASH_OFF_SPLASH_LEGACY
+            && ((uint8_t*)FLASH_OFF_SPLASH_LEGACY + XIP_BASE)[sizeof(splash_img)] == 0x00) {
+        // If the splash image is not set, copy the default image from 8MB offset
+        memcpy(splash_img, (void *)FLASH_OFF_SPLASH_LEGACY + XIP_BASE, sizeof(splash_img));
+        custom_boot_splash_available = true;
     }
-    return ret;
 }
+
+void splash_update_current(const char* card_folder, const char* card_base, int chan_idx) {
+    splash_game_image_available = card_config_read_image(splash_img, card_folder, card_base, chan_idx);
+}
+
+

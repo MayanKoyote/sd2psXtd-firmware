@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include "hardware/watchdog.h"
 #if WITH_LED
@@ -6,7 +7,7 @@
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
 #include "pico/bootrom.h"
-#include "pico/multicore.h"
+#include "flashmap.h"
 #include "hardware/clocks.h"
 #include "hardware/structs/bus_ctrl.h"
 
@@ -38,6 +39,10 @@
 
 
 #include "game_db/game_db.h"
+
+uint flash_capacity = 0;
+uint flash_border = 0;
+
 
 /* reboot to bootloader if either button is held on startup
    to make the device easier to flash when assembled inside case */
@@ -145,11 +150,13 @@ static void debug_task(void) {
 
 
 int main() {
+    int mhz = 240;
     input_init();
+    update_flash_capacity();
     check_bootloader_reset();
 
     printf("prepare...\n");
-    int mhz = 240;
+
     set_sys_clock_khz(mhz * 1000, true);
     clock_configure(clk_peri, 0, CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS, mhz * 1000000, mhz * 1000000);
 
@@ -166,6 +173,10 @@ int main() {
     printf("\n\n\nStarted! Clock %d; bus priority 0x%X\n", (int)clock_get_hz(clk_sys), (unsigned)bus_ctrl_hw->priority);
     printf("SD2PSX Version %s\n", sd2psx_version);
     printf("SD2PSX HW Variant: %s\n", sd2psx_variant);
+    printf("Flash size: %d MB\n", flash_capacity / (1024 * 1024));
+    printf("EEPROM base: 0x%X\n", WEAR_LEVELING_RP2040_FLASH_BASE);
+    printf("CIV base: 0x%X\n", FLASH_OFF_CIV);
+    printf("Splash base: 0x%X\n", FLASH_OFF_SPLASH);
 
     settings_init();
 #if WITH_PSRAM

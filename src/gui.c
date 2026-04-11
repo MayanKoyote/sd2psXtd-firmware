@@ -1178,6 +1178,8 @@ void gui_request_refresh(void) {
 void gui_do_ps1_card_switch(void) {
     log(LOG_INFO, "switching the card now!\n");
 
+    ui_state = UI_STATE_MAIN;
+    time_screen = time_us_64();
     oled_update_last_action_time();
 }
 
@@ -1276,6 +1278,8 @@ void gui_task(void) {
                     lv_label_set_text(src_main_title_lbl, "");
                 }
                 splash_update_current(folder_name, cardman_state == PS1_CM_STATE_BOOT ? "BootCard" : folder_name, ps1_cardman_get_channel());
+                // Make sure to go back to main screen here in case we were on the splash screen due to a game image being shown, otherwise the screen won't update until the next timeout
+                time_screen = time_us_64();
             }
 
             refresh_gui = false;

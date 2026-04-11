@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "hardware/watchdog.h"
+#include "ps1_mmce.h"
 #if WITH_LED
 #include "led.h"
 #endif
@@ -99,11 +100,7 @@ static void debug_task(void) {
                     mmceman_mode = MMCEMAN_MODE_NEXT;
                     mmceman_cmd = MMCEMAN_SET_CHANNEL;
                 }  else {
-                    ps1_memory_card_exit();
-                    ps1_cardman_close();
-                    ps1_cardman_next_channel();
-                    ps1_cardman_open();
-                    ps1_memory_card_enter();
+                    ps1_mmce_next_ch(false);
                 }
             } else if ((in[1] == 'h') && (in[2] == '-')) {
                 DPRINTF("Received Channel Down!\n");
@@ -111,11 +108,7 @@ static void debug_task(void) {
                     mmceman_mode = MMCEMAN_MODE_PREV;
                     mmceman_cmd = MMCEMAN_SET_CHANNEL;
                 } else {
-                    ps1_memory_card_exit();
-                    ps1_cardman_close();
-                    ps1_cardman_prev_channel();
-                    ps1_cardman_open();
-                    ps1_memory_card_enter();
+                    ps1_mmce_prev_ch(false);
                 }
             } else if (in[1] == '+') {
                 DPRINTF("Received Card Up!\n");
@@ -123,11 +116,7 @@ static void debug_task(void) {
                     mmceman_mode = MMCEMAN_MODE_NEXT;
                     mmceman_cmd = MMCEMAN_SET_CARD;
                 } else {
-                    ps1_memory_card_exit();
-                    ps1_cardman_close();
-                    ps1_cardman_next_idx();
-                    ps1_cardman_open();
-                    ps1_memory_card_enter();
+                    ps1_mmce_next_idx(false);
                 }
             } else if (in[1] == '-') {
                 DPRINTF("Received Card Down!\n");
@@ -135,11 +124,7 @@ static void debug_task(void) {
                     mmceman_mode = MMCEMAN_MODE_PREV;
                     mmceman_cmd = MMCEMAN_SET_CARD;
                 } else {
-                    ps1_memory_card_exit();
-                    ps1_cardman_close();
-                    ps1_cardman_prev_idx();
-                    ps1_cardman_open();
-                    ps1_memory_card_enter();
+                    ps1_mmce_prev_idx(false);
                 }
             }
         }

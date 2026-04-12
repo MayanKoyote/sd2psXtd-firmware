@@ -264,7 +264,8 @@ static void reload_card_cb(int progress, bool done) {
     if (done) {
         ps2_cardman_set_progress_cb(NULL);
         input_flush();
-        ui_state = UI_STATE_MAIN;
+        if (ui_state != UI_STATE_SPLASH)
+            ui_state = UI_STATE_MAIN;
     } else if (time_us_64() > GUI_SCREEN_IMAGE_TIMEOUT_US){
         ui_state = UI_STATE_SWITCHING;
     }
@@ -1178,7 +1179,9 @@ void gui_request_refresh(void) {
 void gui_do_ps1_card_switch(void) {
     log(LOG_INFO, "switching the card now!\n");
 
-    ui_state = UI_STATE_MAIN;
+    if (ui_state != UI_STATE_SPLASH) {
+        ui_state = UI_STATE_MAIN;
+    }
     time_screen = time_us_64();
     oled_update_last_action_time();
 }

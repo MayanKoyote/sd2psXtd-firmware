@@ -31,7 +31,7 @@
 //TODO: temp global values, find them a home
 volatile ps2_mmceman_fs_op_data_t *op_data = NULL;
 
-static bool __time_critical_func(ps2_mmceman_receive_path)(uint8_t *buffer, size_t buffer_size)
+static bool __time_critical_func(ps2_mmceman_receive_path)(volatile uint8_t *buffer, size_t buffer_size)
 {
     uint8_t cmd = 0;
     size_t idx = 0;

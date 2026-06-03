@@ -275,20 +275,20 @@ static void ui_set_display_timeout(uint8_t display_timeout) {
     char text[8];
 
     if (auto_off_options[0].value == display_timeout) {
-        sprintf(text, "Off >"), lv_label_set_text(auto_off_lbl, text);
+        snprintf(text, sizeof(text), "Off >"), lv_label_set_text(auto_off_lbl, text);
 
-        sprintf(text, "> Off"), lv_label_set_text(auto_off_options[0].selection_lbl, text);
+        snprintf(text, sizeof(text), "> Off"), lv_label_set_text(auto_off_options[0].selection_lbl, text);
     } else {
-        sprintf(text, "  Off"), lv_label_set_text(auto_off_options[0].selection_lbl, text);
+        snprintf(text, sizeof(text), "  Off"), lv_label_set_text(auto_off_options[0].selection_lbl, text);
     }
 
     for (size_t i = 1; i < ARRAY_SIZE(auto_off_options); i++) {
         if (auto_off_options[i].value == display_timeout) {
-            sprintf(text, "%hhus >", auto_off_options[i].value), lv_label_set_text(auto_off_lbl, text);
+            snprintf(text, sizeof(text), "%hhus >", auto_off_options[i].value), lv_label_set_text(auto_off_lbl, text);
 
-            sprintf(text, "> %hhus", auto_off_options[i].value), lv_label_set_text(auto_off_options[i].selection_lbl, text);
+            snprintf(text, sizeof(text), "> %hhus", auto_off_options[i].value), lv_label_set_text(auto_off_options[i].selection_lbl, text);
         } else {
-            sprintf(text, "  %hhus", auto_off_options[i].value), lv_label_set_text(auto_off_options[i].selection_lbl, text);
+            snprintf(text, sizeof(text), "  %hhus", auto_off_options[i].value), lv_label_set_text(auto_off_options[i].selection_lbl, text);
         }
     }
 }
@@ -298,11 +298,11 @@ static void ui_set_display_contrast(uint8_t display_contrast) {
 
     for (size_t i = 0; i < ARRAY_SIZE(contrast_options); i++) {
         if (contrast_options[i].value == display_contrast) {
-            sprintf(text, "%hhu%% >", contrast_options[i].label_value), lv_label_set_text(contrast_lbl, text);
+            snprintf(text, sizeof(text), "%hhu%% >", contrast_options[i].label_value), lv_label_set_text(contrast_lbl, text);
 
-            sprintf(text, "> %hhu%%", contrast_options[i].label_value), lv_label_set_text(contrast_options[i].selection_lbl, text);
+            snprintf(text, sizeof(text), "> %hhu%%", contrast_options[i].label_value), lv_label_set_text(contrast_options[i].selection_lbl, text);
         } else {
-            sprintf(text, "  %hhu%%", contrast_options[i].label_value), lv_label_set_text(contrast_options[i].selection_lbl, text);
+            snprintf(text, sizeof(text), "  %hhu%%", contrast_options[i].label_value), lv_label_set_text(contrast_options[i].selection_lbl, text);
         }
     }
 }
@@ -324,11 +324,11 @@ static void ui_set_display_vcomh(uint8_t display_vcomh) {
 
     for (size_t i = 0; i < ARRAY_SIZE(vcomh_options); i++) {
         if (vcomh_options[i].value == display_vcomh) {
-            sprintf(text, "%s >", vcomh_options[i].label_text), lv_label_set_text(vcomh_lbl, text);
+            snprintf(text, sizeof(text), "%s >", vcomh_options[i].label_text), lv_label_set_text(vcomh_lbl, text);
 
-            sprintf(text, "> %s", vcomh_options[i].selection_text), lv_label_set_text(vcomh_options[i].selection_lbl, text);
+            snprintf(text, sizeof(text), "> %s", vcomh_options[i].selection_text), lv_label_set_text(vcomh_options[i].selection_lbl, text);
         } else {
-            sprintf(text, "  %s", vcomh_options[i].selection_text), lv_label_set_text(vcomh_options[i].selection_lbl, text);
+            snprintf(text, sizeof(text), "  %s", vcomh_options[i].selection_text), lv_label_set_text(vcomh_options[i].selection_lbl, text);
         }
     }
 }
@@ -787,7 +787,7 @@ static void create_menu_screen(void) {
             uint8_t value = (uint8_t)((255 * percentage) / 100);
             contrast_options[i].value = value;
             contrast_options[i].label_value = percentage;
-            sprintf(text, " %hhu%%", percentage);
+            snprintf(text, sizeof(text), " %hhu%%", percentage);
 
             cont = ui_menu_cont_create_nav(contrast_page);
             contrast_options[i].selection_lbl = ui_label_create_grow(cont, text);

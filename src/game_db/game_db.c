@@ -58,6 +58,10 @@ bool __time_critical_func(game_db_sanity_check_title_id)(const char* const title
         char* prefix = strtok(splittable_game_id, "-");
         char* id = strtok(NULL, "-");
 
+        if (prefix == NULL || id == NULL) {
+            return false;
+        }
+
         while (prefix[i] != 0x00) {
             if (!isalpha((int)prefix[i])) {
                 return false;
@@ -143,6 +147,7 @@ static game_lookup build_arcade_lookup(const char* const db_start, const size_t 
 static game_lookup find_game_lookup(const char* game_id, int mode) {
     char prefixString[MAX_PREFIX_LENGTH] = {};
     char idString[10] = {};
+    char game_id_copy[MAX_GAME_ID_LENGTH] = {};
     uint32_t numeric_id = 0, numeric_prefix = 0;
 
     const char* const db_start = mode == MODE_PS1 ? &_binary_gamedbps1_dat_start : &_binary_gamedbps2_dat_start;
@@ -160,8 +165,12 @@ static game_lookup find_game_lookup(const char* game_id, int mode) {
 
 
     if (game_id != NULL && game_id[0]) {
-        char* copy = strdup(game_id);
-        char* split = strtok(copy, "-");
+        strlcpy(game_id_copy, game_id, sizeof(game_id_copy));
+        char* split = strtok(game_id_copy, "-");
+
+        if (split == NULL || split[0] == 0) {
+            return ret;
+        }
 
         if (strlen(split) > 0) {
             strlcpy(prefixString, split, MAX_PREFIX_LENGTH);
@@ -172,12 +181,14 @@ static game_lookup find_game_lookup(const char* game_id, int mode) {
 
         split = strtok(NULL, "-");
 
+        if (split == NULL || split[0] == 0) {
+            return ret;
+        }
+
         if (strlen(split) > 0) {
             strlcpy(idString, split, 11);
             numeric_id = atoi(idString);
         }
-
-        free(copy);
     }
 
     numeric_prefix = game_db_char_array_to_uint32(prefixString);

@@ -26,8 +26,38 @@
 #define log(level, fmt, x...) LOG_PRINT(LOG_LEVEL_MMCEMAN, level, fmt, ##x)
 #endif
 
+#define MMCEMAN_PATH_BUFFER_SIZE (sizeof(((ps2_mmceman_fs_op_data_t *)0)->buffer[0]))
+
 //TODO: temp global values, find them a home
 volatile ps2_mmceman_fs_op_data_t *op_data = NULL;
+
+static bool __time_critical_func(ps2_mmceman_receive_path)(uint8_t *buffer, size_t buffer_size)
+{
+    uint8_t cmd = 0;
+    size_t idx = 0;
+
+    if (buffer_size == 0) {
+        return false;
+    }
+
+    while (idx < (buffer_size - 1)) {
+        mc_respond(0x0);
+        receiveOrNextCmd(&cmd);
+        buffer[idx++] = cmd;
+        if (cmd == 0x0) {
+            return true;
+        }
+    }
+
+    buffer[buffer_size - 1] = 0x0;
+
+    do {
+        mc_respond(0x0);
+        receiveOrNextCmd(&cmd);
+    } while (cmd != 0x0);
+
+    return false;
+}
 
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_ping)(void)
 {
@@ -211,8 +241,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
     uint8_t cmd;
     uint8_t packed_flags;
 
-    int idx = 0;
-
     switch(mmceman_transfer_stage)
     {
         //Packet #1: Command and flags
@@ -240,10 +268,17 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->fd = -1;
+                mmceman_transfer_stage = 0;
+                ps2_mmceman_set_cb(NULL);
+                mc_respond(0x1);
+                mmceman_op_in_progress = false;
+                MP_CMD_END();
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s flags: 0x%x\n", __func__, (const char*)op_data->buffer, op_data->flags);
 
@@ -702,7 +737,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_remove)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: Command and padding
@@ -724,10 +758,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
 
@@ -758,7 +794,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_mkdir)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: Command and padding
@@ -780,10 +815,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
             MP_SIGNAL_OP();
@@ -813,7 +850,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_rmdir)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: Command and padding
@@ -835,10 +871,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
 
@@ -868,7 +906,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_dopen)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage)
     {
@@ -892,10 +929,11 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         case 1:
             mmceman_transfer_stage = 2;
 
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->fd = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
 
@@ -1071,7 +1109,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_getstat)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: File descriptor
@@ -1092,10 +1129,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
         //Packet #2: Name
         case 1:
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = 1;
+                mmceman_transfer_stage = 2;
+                break;
+            }
 
             op_data->flags = 0; //RD_ONLY
             ps2_mmceman_fs_signal_operation(MMCEMAN_FS_OPEN);
@@ -1149,7 +1188,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
             mc_respond(op_data->rv);
 
-            if (op_data->fd > 0) {
+            if (op_data->fd >= 0) {
                 ps2_mmceman_fs_signal_operation(MMCEMAN_FS_CLOSE);
                 ps2_mmceman_fs_wait_ready();
             }

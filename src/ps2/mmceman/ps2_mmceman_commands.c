@@ -42,7 +42,10 @@ static bool __time_critical_func(ps2_mmceman_receive_path)(uint8_t *buffer, size
 
     while (idx < (buffer_size - 1)) {
         mc_respond(0x0);
-        receiveOrNextCmd(&cmd);
+        if (receive(&cmd) == RECEIVE_RESET) {
+            DPRINTF("Reset at %s:%u", __func__, __LINE__);
+            return false;
+        }
         buffer[idx++] = cmd;
         if (cmd == 0x0) {
             return true;
@@ -53,7 +56,10 @@ static bool __time_critical_func(ps2_mmceman_receive_path)(uint8_t *buffer, size
 
     do {
         mc_respond(0x0);
-        receiveOrNextCmd(&cmd);
+        if (receive(&cmd) == RECEIVE_RESET) {
+            DPRINTF("Reset at %s:%u", __func__, __LINE__);
+            return false;
+        }
     } while (cmd != 0x0);
 
     return false;

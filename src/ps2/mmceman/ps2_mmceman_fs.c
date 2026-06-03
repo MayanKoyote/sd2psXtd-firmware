@@ -29,6 +29,11 @@ static volatile ps2_mmceman_fs_op_data_t op_data;
 static volatile uint32_t mmceman_fs_operation;
 critical_section_t mmceman_fs_crit;
 
+static bool mmceman_fs_fd_has_iterator_slot(int fd)
+{
+    return fd >= 0 && fd < (int)(sizeof(op_data.it_fd) / sizeof(op_data.it_fd[0]));
+}
+
 void ps2_mmceman_fs_init(void)
 {
     op_data.rv = 0;
@@ -261,17 +266,31 @@ void ps2_mmceman_fs_run(void)
 
         case MMCEMAN_FS_DOPEN:
             op_data.fd = sd_open((const char*)op_data.buffer[0], 0x0);
-            op_data.it_fd[op_data.fd] = -1; //clear itr stat
+            if (op_data.fd < 0) {
+                log(LOG_ERROR, "Failed to open dir: %s, fd: %i\n", (const char*)op_data.buffer[0], op_data.fd);
+            } else if (op_data.fd >= sizeof(op_data.it_fd)/sizeof(op_data.it_fd[0])) {
+                log(LOG_ERROR, "Got fd: %i greater than max supported iterators, aborting\n", op_data.fd);
+                sd_close(op_data.fd);
+                op_data.fd = -1;
+            } else {
+                op_data.it_fd[op_data.fd] = -1; //clear itr stat
+            }
             mmceman_fs_operation = MMCEMAN_FS_NONE;
         break;
 
         case MMCEMAN_FS_DCLOSE:
-            if (op_data.it_fd[op_data.fd] > 0) {
+            if (!mmceman_fs_fd_has_iterator_slot(op_data.fd)) {
+                op_data.rv = -1;
+                mmceman_fs_operation = MMCEMAN_FS_NONE;
+                break;
+            }
+
+            if (op_data.it_fd[op_data.fd] >= 0) {
                 sd_close(op_data.it_fd[op_data.fd]); //if iterated on
                 op_data.it_fd[op_data.fd] = -1;
             }
 
-            if (op_data.fd > 0) {
+            if (op_data.fd >= 0) {
                 op_data.rv = sd_close(op_data.fd);
                 op_data.fd = -1;
             }
@@ -279,6 +298,12 @@ void ps2_mmceman_fs_run(void)
         break;
 
         case MMCEMAN_FS_DREAD:
+            if (!mmceman_fs_fd_has_iterator_slot(op_data.fd)) {
+                op_data.rv = -1;
+                mmceman_fs_operation = MMCEMAN_FS_NONE;
+                break;
+            }
+
             //TODO: rework dir iteration
             op_data.it_fd[op_data.fd] = sd_iterate_dir(op_data.fd, op_data.it_fd[op_data.fd]);
 
@@ -297,7 +322,7 @@ void ps2_mmceman_fs_run(void)
         break;
 
         case MMCEMAN_FS_GETSTAT:
-            if (op_data.fd > 0) {
+            if (op_data.fd >= 0) {
                 sd_get_stat(op_data.fd, (ps2_fileio_stat_t*)&op_data.fileio_stat);
                 op_data.rv = 0;
             } else {

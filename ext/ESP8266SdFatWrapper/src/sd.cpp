@@ -135,8 +135,13 @@ extern "C" int sd_read(int fd, void *buf, size_t count) {
 
 extern "C" int sd_write(int fd, void *buf, size_t count) {
     CHECK_FD(fd);
+    int retry = 5;
+    size_t ret = files[fd].write(buf, count);
+    while (ret != count && retry-- > 0) {
+        ret = files[fd].write(buf, count);
+    }
 
-    return files[fd].write(buf, count);
+    return ret;
 }
 
 extern "C" int sd_seek(int fd, int32_t offset, int whence) {
@@ -181,6 +186,11 @@ extern "C" int sd_filesize(int fd) {
 extern "C" int sd_rmdir(const char* path) {
     /* return 1 on error */
     return sd.rmdir(path) != true;
+}
+
+extern "C" int sd_rename(const char* old_path, const char* new_path) {
+    /* return 1 on error */
+    return sd.rename(old_path, new_path) != true;
 }
 
 extern "C" int sd_remove(const char* path) {

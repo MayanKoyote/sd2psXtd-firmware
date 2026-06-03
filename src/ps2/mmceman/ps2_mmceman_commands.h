@@ -28,6 +28,7 @@
 #define MMCEMAN_CMD_FS_DCLOSE 0x4a
 #define MMCEMAN_CMD_FS_DREAD 0x4b
 #define MMCEMAN_CMD_FS_GETSTAT 0x4c
+#define MMCEMAN_CMD_FS_RENAME 0x4d
 
 #define MMCEMAN_CMD_FS_LSEEK64 0x53
 
@@ -61,5 +62,6 @@ extern void ps2_mmceman_cmd_fs_dopen(void);
 extern void ps2_mmceman_cmd_fs_dread(void);
 extern void ps2_mmceman_cmd_fs_getstat(void);
 extern void ps2_mmceman_cmd_fs_lseek64(void);
+extern void ps2_mmceman_cmd_fs_rename(void);
 
 extern void ps2_mmceman_cmd_fs_read_sector(void);

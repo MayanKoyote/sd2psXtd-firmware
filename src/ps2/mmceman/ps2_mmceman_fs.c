@@ -352,6 +352,10 @@ void ps2_mmceman_fs_run(void)
             log(LOG_INFO, "MMCEMAN FS Reset\n");
         break;
 
+        case MMCEMAN_FS_RENAME:
+            op_data.rv = sd_rename((const char*)op_data.buffer[0], (const char*)op_data.buffer[1]);
+            mmceman_fs_operation = MMCEMAN_FS_NONE;
+
         default:
         break;
     }

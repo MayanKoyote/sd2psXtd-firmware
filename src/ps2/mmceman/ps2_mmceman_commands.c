@@ -1275,6 +1275,76 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
     MP_CMD_END();
 }
 
+inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_rename)(void)
+{
+    uint8_t cmd;
+
+    switch(mmceman_transfer_stage)
+    {
+        //Packet #1: Command and flags
+        case 0:
+            MP_CMD_START();
+            mmceman_op_in_progress = true;
+
+            ps2_mmceman_fs_wait_ready();            //Wait for file handling to be ready
+            op_data = ps2_mmceman_fs_get_op_data();    //Get pointer to mmce fs op_data
+
+            mc_respond(0x0); receiveOrNextCmd(&cmd);            //Reserved byte
+
+            //Jump to this function after /CS triggered reset
+            ps2_mmceman_set_cb(&ps2_mmceman_cmd_fs_rename);
+
+            mmceman_transfer_stage = 1; //Update stage
+            mc_respond(0xff);   //End transfer
+        break;
+
+        //Packet #2: Filename
+        case 1:
+            mmceman_transfer_stage = 2;
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: old filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                mmceman_transfer_stage = 3;
+                break;
+            }
+
+            log(LOG_INFO, "%s: name: %s \n", __func__, (const char*)op_data->buffer[0]);
+            //Signal op in core1 (ps2_mmceman_fs_run)
+        break;
+
+        //Packet #3: New filename
+        case 2:
+            mmceman_transfer_stage = 3;
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[1], sizeof(op_data->buffer[1]))) {
+                log(LOG_ERROR, "%s: new filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
+
+            log(LOG_INFO, "%s: name: %s \n", __func__, (const char*)op_data->buffer[1]);
+
+            MP_SIGNAL_OP();
+            ps2_mmceman_fs_signal_operation(MMCEMAN_FS_RENAME);
+        break;
+
+        //Packet #4: Final package
+        case 3:
+            ps2_mmceman_fs_wait_ready();//Wait ready up to 1s
+
+            mmceman_transfer_stage = 0;
+            ps2_mmceman_set_cb(NULL);
+
+            mc_respond(op_data->rv);
+            mc_respond(term);
+
+            mmceman_op_in_progress = false;
+            MP_CMD_END();
+        break;
+    }
+}
+
 //Used only by MMCEDRV atm
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_read_sector)(void)
 {

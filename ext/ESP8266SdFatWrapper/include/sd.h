@@ -79,7 +79,7 @@ int sd_exists(const char *path);
 
 int sd_remove(const char* path);
 int sd_rmdir(const char* path);
-
+int sd_rename(const char* old_path, const char* new_path);
 int sd_get_stat(int fd, ps2_fileio_stat_t* const ps2_fileio_stat);
 
 int sd_iterate_dir(int dir, int it);

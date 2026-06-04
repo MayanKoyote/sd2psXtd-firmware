@@ -640,12 +640,12 @@ void ps2_cardman_close(void) {
 
 void ps2_cardman_set_channel(uint16_t chan_num) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
-    if (chan_num != card_chan)
+    if (chan_num != card_chan) {
         needs_update = true;
+    }
     if (chan_num <= max_chan && chan_num >= CHAN_MIN) {
         card_chan = chan_num;
     }
-    snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
 }
 
 void ps2_cardman_next_channel(void) {

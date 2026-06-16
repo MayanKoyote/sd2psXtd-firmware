@@ -53,7 +53,10 @@ int current_read_sector = 0, priority_sector = -1;
 
 #define MAX_GAME_NAME_LENGTH (127)
 #define MAX_PREFIX_LENGTH    (4)
+#define MAX_PATH_LENGTH      (256)
+
 #define MAX_SLICE_LENGTH     (30 * 1000)
+
 
 static int card_variant;
 static int card_idx;
@@ -510,87 +513,127 @@ static void ps2_cardman_continue(void) {
     }
 }
 
-void ps2_cardman_open(void) {
-    char path[256];
+static bool ps2_check_cardsize(uint32_t filesize) {
+    switch (filesize) {
+        case PS2_CARD_SIZE_512K:
+        case PS2_CARD_SIZE_1M:
+        case PS2_CARD_SIZE_2M:
+        case PS2_CARD_SIZE_4M:
+        case PS2_CARD_SIZE_8M:
+        case PS2_CARD_SIZE_16M:
+        case PS2_CARD_SIZE_32M:
+        case PS2_CARD_SIZE_64M:
+        case PS2_CARD_SIZE_128M: return true;
+        default: return false;
+    }
+}
 
-    needs_update = false;
+static void ps2_cardman_initializePSRAMCard(void) {
+        // quickly generate and write an empty card into PSRAM so that it's immediately available, takes about ~0.6s
+    for (size_t pos = 0; pos < card_size; pos += BLOCK_SIZE) {
+        if (card_size == PS2_CARD_SIZE_8M)
+            genblock(pos, flushbuf);
+        else
+            memset(flushbuf, 0xFF, BLOCK_SIZE);
 
-    ensuredirs();
+        ps2_dirty_lock();
+        psram_write_dma(pos, flushbuf, BLOCK_SIZE, NULL);
+        psram_wait_for_dma();
+        ps2_cardman_mark_sector_available(pos / BLOCK_SIZE);
+        ps2_dirty_unlock();
+    }
+    log(LOG_TRACE, "%s created empty PSRAM image... \n", __func__);
+}
 
+static void ps2_cardman_createCard(char* path) {
+    card_size = card_config_get_ps2_cardsize(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name) * 1024 * 1024;
+    if (card_size == 0U) {
+        card_size = settings_get_ps2_cardsize() * 1024 * 1024;
+    }
+    cardman_fd = sd_open(path, O_RDWR | O_CREAT | O_TRUNC);
+    cardman_sectors_done = 0;
+    cardprog_pos = 0;
+    if (card_size > PS2_CARD_SIZE_8M) {
+        ps2_mc_data_interface_set_sdmode(true);
+    } else {
+        ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE);
+    }
+
+    if (cardman_fd < 0)
+        fatal(ERR_CARDMAN, "cannot open for creating new card");
+
+    log(LOG_INFO, "create new image at %s... ", path);
+
+    if (cardman_cb)
+        cardman_cb(0, false);
+#if WITH_PSRAM
+    if (card_size <= PS2_CARD_SIZE_8M) {
+        ps2_cardman_initializePSRAMCard();
+    }
+#endif
+}
+
+static void ps2_cardman_resolveCardPath(char* path) {
     switch (cardman_state) {
         case PS2_CM_STATE_BOOT:
             if (card_chan == 1) {
-                snprintf(path, sizeof(path), "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
+                snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
                 if (!sd_exists(path)) {
                     // before boot card channels, boot card was located at BOOT/BootCard.mcd, for backwards compatibility check if it exists
-                    snprintf(path, sizeof(path), "%s/%s/BootCard.mcd", cardhome, folder_name);
+                    snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard.mcd", cardhome, folder_name);
                 }
                 if (!sd_exists(path)) {
                     // go back to BootCard-1.mcd if it doesn't
-                    snprintf(path, sizeof(path), "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
+                    snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
                 }
             } else {
-                snprintf(path, sizeof(path), "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
+                snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
             }
 
             settings_set_ps2_boot_channel(card_chan);
             break;
         case PS2_CM_STATE_NAMED:
-        case PS2_CM_STATE_GAMEID: snprintf(path, sizeof(path), "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan); break;
+        case PS2_CM_STATE_GAMEID: snprintf(path, MAX_PATH_LENGTH, "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan); break;
         case PS2_CM_STATE_NORMAL:
-            snprintf(path, sizeof(path), "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan);
+            snprintf(path, MAX_PATH_LENGTH, "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan);
 
             /* this is ok to do on every boot because it wouldn't update if the value is the same as currently stored */
             settings_set_ps2_card(card_idx);
             settings_set_ps2_channel(card_chan);
             break;
     }
+}
+
+static void ps2_cardman_move_card_crp(char* path) {
+    char crp_path[MAX_PATH_LENGTH] = {};
+    for (int i = 0; i < 512; i++) {
+        snprintf(crp_path, sizeof(crp_path), "%s/%s/%s-%d.crp.%i", cardhome, folder_name, folder_name, card_chan, i);
+        if (!sd_exists(crp_path))
+            break;
+    }
+    if (!crp_path[0])
+        fatal(ERR_CARDMAN, "Card %d Chann %d invalid size and cannot create .crp file", card_idx, card_chan);
+    sd_close(cardman_fd);
+    sd_rename(path, crp_path);
+    log(LOG_ERROR, "Card %d Chann %d has invalid size and was renamed to %s\n", card_idx, card_chan, crp_path);
+}
+
+void ps2_cardman_open(void) {
+    char path[MAX_PATH_LENGTH];
+
+    needs_update = false;
+
+    ensuredirs();
+
+    ps2_cardman_resolveCardPath(path);
 
     log(LOG_INFO, "Switching to card path = %s\n", path);
+
     ps2_mc_data_interface_card_changed();
 
     if (!sd_exists(path)) {
-        card_size = card_config_get_ps2_cardsize(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name) * 1024 * 1024;
-        if (card_size == 0U) {
-            card_size = settings_get_ps2_cardsize() * 1024 * 1024;
-        }
         cardman_operation = CARDMAN_CREATE;
-        cardman_fd = sd_open(path, O_RDWR | O_CREAT | O_TRUNC);
-        cardman_sectors_done = 0;
-        cardprog_pos = 0;
-        if (card_size > PS2_CARD_SIZE_8M) {
-            ps2_mc_data_interface_set_sdmode(true);
-        } else {
-            ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE);
-        }
-
-        if (cardman_fd < 0)
-            fatal(ERR_CARDMAN, "cannot open for creating new card");
-
-        log(LOG_INFO, "create new image at %s... ", path);
-
-        if (cardman_cb)
-            cardman_cb(0, false);
-#if WITH_PSRAM
-        if (card_size <= PS2_CARD_SIZE_8M) {
-            // quickly generate and write an empty card into PSRAM so that it's immediately available, takes about ~0.6s
-            for (size_t pos = 0; pos < card_size; pos += BLOCK_SIZE) {
-                if (card_size == PS2_CARD_SIZE_8M)
-                    genblock(pos, flushbuf);
-                else
-                    memset(flushbuf, 0xFF, BLOCK_SIZE);
-
-                ps2_dirty_lock();
-                psram_write_dma(pos, flushbuf, BLOCK_SIZE, NULL);
-                psram_wait_for_dma();
-                ps2_cardman_mark_sector_available(pos / BLOCK_SIZE);
-                ps2_dirty_unlock();
-            }
-            log(LOG_TRACE, "%s created empty PSRAM image... \n", __func__);
-        }
-#endif
-        cardprog_start = time_us_64();
-
+        ps2_cardman_createCard(path);
     } else {
         cardman_fd = sd_open(path, O_RDWR);
         card_size = sd_filesize(cardman_fd);
@@ -601,24 +644,25 @@ void ps2_cardman_open(void) {
         if (cardman_fd < 0)
             fatal(ERR_CARDMAN, "cannot open card");
 
-        switch (card_size) {
-            case PS2_CARD_SIZE_512K:
-            case PS2_CARD_SIZE_1M:
-            case PS2_CARD_SIZE_2M:
-            case PS2_CARD_SIZE_4M:
-            case PS2_CARD_SIZE_8M: ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE); break;
-            case PS2_CARD_SIZE_16M:
-            case PS2_CARD_SIZE_32M:
-            case PS2_CARD_SIZE_64M: ps2_mc_data_interface_set_sdmode(true); break;
-            default: fatal(ERR_CARDMAN, "Card %d Chann %d invalid size", card_idx, card_chan); break;
+        if (ps2_check_cardsize(card_size)) {
+            cardman_operation = CARDMAN_OPEN;
+            cardprog_pos = 0;
+            cardman_sectors_done = 0;
+            if (card_size > PS2_CARD_SIZE_8M) {
+                ps2_mc_data_interface_set_sdmode(true);
+            } else {
+                ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE);
+            }
+            log(LOG_INFO, "reading card (%lu KB).... ", (uint32_t)(card_size / 1024));
+            if (cardman_cb)
+                cardman_cb(0, false);
+        } else {
+            cardman_operation = CARDMAN_CREATE;
+            ps2_cardman_move_card_crp(path);
+            ps2_cardman_createCard(path);
         }
-
-        /* read 8 megs of card image */
-        log(LOG_INFO, "reading card (%lu KB).... ", (uint32_t)(card_size / 1024));
-        cardprog_start = time_us_64();
-        if (cardman_cb)
-            cardman_cb(0, false);
     }
+    cardprog_start = time_us_64();
 
     sector_count = card_size / BLOCK_SIZE;
 
@@ -640,10 +684,8 @@ void ps2_cardman_close(void) {
 
 void ps2_cardman_set_channel(uint16_t chan_num) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
-    if (chan_num != card_chan) {
-        needs_update = true;
-    }
     if (chan_num <= max_chan && chan_num >= CHAN_MIN) {
+        needs_update |= (chan_num != card_chan);
         card_chan = chan_num;
     }
 }
@@ -679,11 +721,11 @@ void ps2_cardman_switch_bootcard(void) {
 }
 
 void ps2_cardman_set_idx(uint16_t idx_num) {
-    if (idx_num != card_idx)
-        needs_update = true;
     if ((idx_num >= IDX_MIN) && (idx_num < UINT16_MAX)) {
+        needs_update |= (idx_num != card_idx);
         card_idx = idx_num;
         card_chan = CHAN_MIN;
+        cardman_state = PS2_CM_STATE_NORMAL;
     }
     snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
 }

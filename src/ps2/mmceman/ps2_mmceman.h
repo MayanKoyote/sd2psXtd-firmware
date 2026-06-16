@@ -21,6 +21,7 @@ extern volatile bool mmceman_fs_abort_read;
 extern volatile uint8_t mmceman_cmd;
 extern volatile uint8_t mmceman_mode;
 extern volatile uint16_t mmceman_cnum;
+extern volatile uint16_t mmceman_chn;
 extern char mmceman_gameid[251];
 
 void ps2_mmceman_task(void);

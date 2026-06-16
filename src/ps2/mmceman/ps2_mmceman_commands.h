@@ -11,6 +11,7 @@
 #define MMCEMAN_GET_GAMEID 0x7
 #define MMCEMAN_SET_GAMEID 0x8
 #define MMCEMAN_RESET 0x9
+#define MMCEMAN_SET_CARD_CHANNEL 0xa
 
 //TEMP
 #define MMCEMAN_SWITCH_BOOTCARD 0x20
@@ -28,7 +29,7 @@
 #define MMCEMAN_CMD_FS_DCLOSE 0x4a
 #define MMCEMAN_CMD_FS_DREAD 0x4b
 #define MMCEMAN_CMD_FS_GETSTAT 0x4c
-#define MMCEMAN_CMD_FS_RENAME 0x4d
+#define MMCEMAN_CMD_FS_RENAME 0x4e
 
 #define MMCEMAN_CMD_FS_LSEEK64 0x53
 
@@ -48,6 +49,7 @@ extern void ps2_mmceman_cmd_get_gameid(void);
 extern void ps2_mmceman_cmd_set_gameid(void);
 extern void ps2_mmceman_cmd_unmount_bootcard(void);
 extern void ps2_mmceman_cmd_reset(void);
+extern void ps2_mmceman_cmd_set_card_channel(void);
 
 extern void ps2_mmceman_cmd_fs_open(void);
 extern void ps2_mmceman_cmd_fs_close(void);

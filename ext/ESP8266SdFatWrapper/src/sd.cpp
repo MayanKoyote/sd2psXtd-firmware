@@ -190,7 +190,7 @@ extern "C" int sd_rmdir(const char* path) {
 
 extern "C" int sd_rename(const char* old_path, const char* new_path) {
     /* return 1 on error */
-    return sd.rename(old_path, new_path) != true;
+    return !sd.rename(old_path, new_path) ? -1 : 0;
 }
 
 extern "C" int sd_remove(const char* path) {

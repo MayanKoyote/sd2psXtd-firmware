@@ -304,6 +304,7 @@ static void __time_critical_func(mc_main_loop)(void) {
                 case MMCEMAN_SET_GAMEID: ps2_mmceman_cmd_set_gameid(); break;
                 case MMCEMAN_UNMOUNT_BOOTCARD: ps2_mmceman_cmd_unmount_bootcard(); break;
                 case MMCEMAN_RESET: ps2_mmceman_cmd_reset(); break;
+                case MMCEMAN_SET_CARD_CHANNEL: ps2_mmceman_cmd_set_card_channel(); break;
                 case MMCEMAN_CMD_FS_OPEN: ps2_mmceman_cmd_fs_open(); break;
                 case MMCEMAN_CMD_FS_CLOSE: ps2_mmceman_cmd_fs_close(); break;
                 case MMCEMAN_CMD_FS_READ: ps2_mmceman_cmd_fs_read(); break;
@@ -316,6 +317,7 @@ static void __time_critical_func(mc_main_loop)(void) {
                 case MMCEMAN_CMD_FS_DCLOSE: ps2_mmceman_cmd_fs_dclose(); break;
                 case MMCEMAN_CMD_FS_DREAD: ps2_mmceman_cmd_fs_dread(); break;
                 case MMCEMAN_CMD_FS_GETSTAT: ps2_mmceman_cmd_fs_getstat(); break;
+                case MMCEMAN_CMD_FS_RENAME: ps2_mmceman_cmd_fs_rename(); break;
 
                 case MMCEMAN_CMD_FS_LSEEK64: ps2_mmceman_cmd_fs_lseek64(); break;
                 case MMCEMAN_CMD_FS_READ_SECTOR: ps2_mmceman_cmd_fs_read_sector(); break;

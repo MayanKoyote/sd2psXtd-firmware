@@ -45,6 +45,7 @@ volatile bool mmceman_fs_abort_read = false;
 volatile uint8_t mmceman_cmd;
 volatile uint8_t mmceman_mode;
 volatile uint16_t mmceman_cnum;
+volatile uint16_t mmceman_chn;
 
 char mmceman_gameid[251] = {0x00};
 static uint64_t mmceman_switching_timeout = 0;
@@ -68,7 +69,7 @@ void ps2_mmceman_task(void) {
 
             case MMCEMAN_SET_CHANNEL:
                 if (mmceman_mode == MMCEMAN_MODE_NUM) {
-                    ps2_cardman_set_channel(mmceman_cnum);
+                    ps2_cardman_set_channel(mmceman_chn);
                     log(LOG_INFO, "set num channel\n");
                 } else if (mmceman_mode == MMCEMAN_MODE_NEXT) {
                     ps2_cardman_next_channel();
@@ -105,7 +106,14 @@ void ps2_mmceman_task(void) {
                     ps2_cardman_next_idx();
                 }
                 break;
-
+            case MMCEMAN_SET_CARD_CHANNEL:
+                if (mmceman_cnum == 0) {
+                    ps2_cardman_switch_bootcard();
+                } else {
+                    ps2_cardman_set_idx(mmceman_cnum);
+                }
+                ps2_cardman_set_channel(mmceman_chn);
+                break;
             default: break;
         }
 

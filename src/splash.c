@@ -158,7 +158,7 @@ static void __not_in_flash_func(splash_deploy)(uint8_t* buff, size_t size) {
 void splash_init(void) {
     if (sd_exists("splash.bin")){
         int fd = sd_open("splash.bin", O_RDONLY);
-        uint8_t buff[sizeof(splash_img) + 1];
+        uint8_t buff[sizeof(splash_img) + 1] = {0};
         sd_read(fd, (void *)buff, sizeof(splash_img));
         sd_close(fd);
         splash_deploy(buff, sizeof(buff));

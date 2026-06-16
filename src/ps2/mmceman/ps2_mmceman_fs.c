@@ -40,7 +40,7 @@ void ps2_mmceman_fs_init(void)
     op_data.fd = 0;
     //op_data.it_fd = 0;
 
-    memset(op_data.it_fd, -1, 16);
+    memset((void*)op_data.it_fd, -1, sizeof(op_data.it_fd));
     op_data.flags = 0;
 
     op_data.filesize = 0;
@@ -268,7 +268,7 @@ void ps2_mmceman_fs_run(void)
             op_data.fd = sd_open((const char*)op_data.buffer[0], 0x0);
             if (op_data.fd < 0) {
                 log(LOG_ERROR, "Failed to open dir: %s, fd: %i\n", (const char*)op_data.buffer[0], op_data.fd);
-            } else if (op_data.fd >= sizeof(op_data.it_fd)/sizeof(op_data.it_fd[0])) {
+            } else if (op_data.fd >= (int)(sizeof(op_data.it_fd) / sizeof(op_data.it_fd[0]))) {
                 log(LOG_ERROR, "Got fd: %i greater than max supported iterators, aborting\n", op_data.fd);
                 sd_close(op_data.fd);
                 op_data.fd = -1;
@@ -344,7 +344,7 @@ void ps2_mmceman_fs_run(void)
                 }
             }
 
-            memset(op_data.it_fd, -1, 16);
+            memset((void*)op_data.it_fd, -1, sizeof(op_data.it_fd));
 
             //Reset mmceman_fs
             ps2_mmceman_fs_init();

@@ -22,8 +22,8 @@
 #define MAX_READ_AHEAD 0
 #define PS1_CARD_SIZE 128 * 1024
 
-static bool dma_in_progress = false;
-static bool write_occured = false;
+static volatile bool dma_in_progress = false;
+static volatile bool write_occured = false;
 
 
 #define card cache
@@ -57,6 +57,7 @@ uint8_t* __time_critical_func(ps1_mc_data_interface_get_page)(uint32_t page) {
     uint8_t* ret = NULL;
 
 #ifdef WITH_PSRAM
+    (void)page;
     ret = card;
 #else
     ret = &card[page*PS1_PAGE_SIZE];

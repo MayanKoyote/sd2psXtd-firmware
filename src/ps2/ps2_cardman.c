@@ -528,6 +528,7 @@ static bool ps2_check_cardsize(uint32_t filesize) {
     }
 }
 
+#if WITH_PSRAM
 static void ps2_cardman_initializePSRAMCard(void) {
         // quickly generate and write an empty card into PSRAM so that it's immediately available, takes about ~0.6s
     for (size_t pos = 0; pos < card_size; pos += BLOCK_SIZE) {
@@ -544,6 +545,7 @@ static void ps2_cardman_initializePSRAMCard(void) {
     }
     log(LOG_TRACE, "%s created empty PSRAM image... \n", __func__);
 }
+#endif
 
 static void ps2_cardman_createCard(char* path) {
     card_size = card_config_get_ps2_cardsize(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name) * 1024 * 1024;

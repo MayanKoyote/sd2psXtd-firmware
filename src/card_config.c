@@ -40,7 +40,7 @@ static int parse_custom_card_folder(void *user, const char *section, const char 
 
     #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     if (MATCH(ctx->mode, ctx->game_id)) {
-        if (strlen(value) <= ctx->card_folder_max_len) {
+        if (ctx->card_folder != NULL && ctx->card_folder_max_len > 0) {
             strlcpy(ctx->card_folder, value, ctx->card_folder_max_len);
         }
     }
@@ -56,8 +56,8 @@ static int parse_card_configuration(void *user, const char *section, const char 
 
     #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     if (MATCH("ChannelName", ctx->channel_number)) {
-        if (strlen(value) <= ctx->channel_name_max_len) {
-            strcpy(ctx->channel_name, value);
+        if (ctx->channel_name != NULL && ctx->channel_name_max_len > 0) {
+            strlcpy(ctx->channel_name, value, ctx->channel_name_max_len);
         }
     } else if (MATCH("Settings", "CardSize")) {
         int size = atoi(value);

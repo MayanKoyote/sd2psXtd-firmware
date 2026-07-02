@@ -1,8 +1,5 @@
 #include <serial_input.h>
-#include <stdint.h>
-#include <stdio.h>
-#include "hardware/watchdog.h"
-#include "ps1_mmce.h"
+
 #if WITH_LED
 #include "led.h"
 #endif
@@ -13,10 +10,6 @@
 #include "hardware/clocks.h"
 #include "hardware/structs/bus_ctrl.h"
 
-#if WITH_GUI
-#include "oled.h"
-#include "gui.h"
-#endif
 #include "input.h"
 #include "config.h"
 #include "debug.h"
@@ -27,11 +20,8 @@
 #include "psram/psram.h"
 #endif
 
-
 #include "ps2.h"
 #include "ps1.h"
-
-
 
 #include "game_db/game_db.h"
 
@@ -73,12 +63,11 @@ static void debug_task(void) {
             break;
         }
     }
-#if DEBUG_USB_UART
+
     if (wrote_debug_output) {
         serial_input_notify_output();
     }
     serial_input_process();
-#endif
 }
 
 

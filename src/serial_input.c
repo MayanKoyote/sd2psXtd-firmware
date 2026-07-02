@@ -7,11 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if WITH_GUI
 #include "gui.h"
+#endif
 #include "ps1/ps1_mmce.h"
 #include "ps2/mmceman/ps2_mmceman.h"
-#include "ps2/mmceman/ps2_mmceman_commands.h"
-#include "ps2/ps2_cardman.h"
 
 #include "debug.h"
 #include "serial_input.h"
@@ -352,36 +352,48 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
         case SERIAL_INPUT_CMD_PS1_MODE:
             QPRINTF("Set Mode: PS1\n");
             settings_set_mode(MODE_PS1);
+            #if WITH_GUI
             gui_request_refresh();
+            #endif
             break;
         case SERIAL_INPUT_CMD_PS2_MODE:
             QPRINTF("Set Mode: PS2\n");
             settings_set_mode(MODE_PS2);
+            #if WITH_GUI
             gui_request_refresh();
+            #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_RETAIL:
             QPRINTF("Set PS2 Variant: Retail\n");
             settings_set_ps2_variant(PS2_VARIANT_RETAIL);
             settings_set_mode(MODE_PS2);
+            #if WITH_GUI
             gui_request_refresh();
+            #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_PROTO:
             QPRINTF("Set PS2 Variant: Proto\n");
             settings_set_ps2_variant(PS2_VARIANT_PROTO);
             settings_set_mode(MODE_PS2);
+            #if WITH_GUI
             gui_request_refresh();
+            #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_SC2:
             QPRINTF("Set PS2 Variant: Conquest\n");
             settings_set_ps2_variant(PS2_VARIANT_SC2);
             settings_set_mode(MODE_PS2);
+            #if WITH_GUI
             gui_request_refresh();
+            #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_COH:
             QPRINTF("Set PS2 Variant: Arcade\n");
             settings_set_ps2_variant(PS2_VARIANT_COH);
             settings_set_mode(MODE_PS2);
+            #if WITH_GUI
             gui_request_refresh();
+            #endif
             break;
         case SERIAL_INPUT_CMD_HELP:
             QPRINTF("%s", help_text);

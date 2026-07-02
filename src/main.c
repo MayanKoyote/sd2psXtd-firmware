@@ -140,7 +140,7 @@ int main() {
     update_flash_capacity();
     check_bootloader_reset();
 
-    printf("prepare...\n");
+    QPRINTF("prepare...\n");
 
     set_sys_clock_khz(mhz * 1000, true);
     clock_configure(clk_peri, 0, CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS, mhz * 1000000, mhz * 1000000);
@@ -155,13 +155,13 @@ int main() {
     bus_ctrl_hw->priority |= BUSCTRL_BUS_PRIORITY_PROC1_BITS;
     while (!bus_ctrl_hw->priority_ack) {}
 
-    printf("\n\n\nStarted! Clock %d; bus priority 0x%X\n", (int)clock_get_hz(clk_sys), (unsigned)bus_ctrl_hw->priority);
-    printf("SD2PSX Version %s\n", sd2psx_version);
-    printf("SD2PSX HW Variant: %s\n", sd2psx_variant);
-    printf("Flash size: %d MB\n", flash_capacity / (1024 * 1024));
-    printf("EEPROM base: 0x%X\n", WEAR_LEVELING_RP2040_FLASH_BASE);
-    printf("CIV base: 0x%X\n", FLASH_OFF_CIV);
-    printf("Splash base: 0x%X\n", FLASH_OFF_SPLASH);
+    QPRINTF("\n\n\nStarted! Clock %d; bus priority 0x%X\n", (int)clock_get_hz(clk_sys), (unsigned)bus_ctrl_hw->priority);
+    QPRINTF("SD2PSX Version %s\n", sd2psx_version);
+    QPRINTF("SD2PSX HW Variant: %s\n", sd2psx_variant);
+    QPRINTF("Flash size: %d MB\n", flash_capacity / (1024 * 1024));
+    QPRINTF("EEPROM base: 0x%X\n", WEAR_LEVELING_RP2040_FLASH_BASE);
+    QPRINTF("CIV base: 0x%X\n", FLASH_OFF_CIV);
+    QPRINTF("Splash base: 0x%X\n", FLASH_OFF_SPLASH);
 
     settings_init();
 #if WITH_PSRAM
@@ -177,7 +177,7 @@ int main() {
 
     while (1) {
         if (settings_get_mode(true) == MODE_PS2) {
-            printf("Starting PS2 mode...\n");
+            QPRINTF("Starting PS2 mode...\n");
             ps2_init();
             settings_load_sd();
             do {
@@ -186,7 +186,7 @@ int main() {
             ps2_deinit();
 
         } else {
-            printf("Starting PS1 mode...\n");
+            QPRINTF("Starting PS1 mode...\n");
             ps1_init();
             settings_load_sd();
             do {

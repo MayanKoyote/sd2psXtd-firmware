@@ -24,7 +24,7 @@ const char *log_level_str[] = {
 static char debug_queue[1024];
 static size_t debug_read_pos, debug_write_pos;
 
-void debug_put(char c) {
+void __time_critical_func(debug_put)(char c) {
     debug_queue[debug_write_pos] = c;
     debug_write_pos = (debug_write_pos + 1) % sizeof(debug_queue);
 }

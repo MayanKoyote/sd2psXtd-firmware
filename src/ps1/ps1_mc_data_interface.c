@@ -16,8 +16,6 @@
 #include "debug.h"
 
 
-#define QPRINTF(fmt, x...) printf(fmt, ##x)
-
 #define PAGE_CACHE_SIZE 40
 #define MAX_READ_AHEAD 0
 #define PS1_CARD_SIZE 128 * 1024

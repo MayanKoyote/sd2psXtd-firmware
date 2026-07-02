@@ -131,7 +131,8 @@ if (SD2PSX_WITH_GUI)
                 PUBLIC
                     lvgl::lvgl
                 PRIVATE
-                    ssd1306)
+                    ssd1306
+                    sd2psx_version)
 endif()
 
 if (SD2PSX_WITH_LED)

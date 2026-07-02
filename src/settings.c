@@ -144,7 +144,7 @@ static void settings_deserialize(void) {
         ini_parse_sd_file(fd, parse_card_configuration, &newSettings);
         sd_close(fd);
         if (memcmp(&newSettings, &serialized_settings, sizeof(serialized_settings))) {
-            printf("Updating settings from ini\n");
+            QPRINTF("Updating settings from ini\n");
             serialized_settings      = newSettings;
             settings.sys_flags       = newSettings.sys_flags;
             settings.ps2_flags       = newSettings.ps2_flags;
@@ -178,7 +178,7 @@ static void settings_serialize(void) {
 
     fd = sd_open(settings_path, O_RDWR | O_CREAT);
     if (fd >= 0) {
-        printf("Serializing Settings\n");
+        QPRINTF("Serializing Settings\n");
         char line_buffer[256] = { 0x0 };
         int written = snprintf(line_buffer, 256, "[General]\n");
         sd_write(fd, line_buffer, written);
@@ -260,9 +260,9 @@ void settings_load_sd(void) {
 }
 
 void settings_init(void) {
-    printf("Settings - init\n");
+    QPRINTF("Settings - init\n");
     if (wear_leveling_init() == WEAR_LEVELING_FAILED) {
-        printf("failed to init wear leveling, reset settings\n");
+        QPRINTF("failed to init wear leveling, reset settings\n");
         settings_reset();
 
         if (wear_leveling_init() == WEAR_LEVELING_FAILED)
@@ -272,7 +272,7 @@ void settings_init(void) {
     wear_leveling_read(0, &settings, sizeof(settings));
 
     if (settings.version_magic != SETTINGS_VERSION_MAGIC) {
-        printf("version magic mismatch, reset settings\n");
+        QPRINTF("version magic mismatch, reset settings\n");
         settings_reset();
     }
 

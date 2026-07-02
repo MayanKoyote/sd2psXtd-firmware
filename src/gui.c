@@ -97,7 +97,6 @@ static void ui_goto_screen(lv_obj_t *scr) {
     if (lv_scr_act() != scr) {
         UI_GOTO_SCREEN(scr);
         time_screen = time_us_64();
-        printf("Changed screen\n");
     }
 }
 

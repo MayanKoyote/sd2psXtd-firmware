@@ -37,3 +37,5 @@ void ps2_mmceman_prev_ch(bool delay);
 void ps2_mmceman_next_idx(bool delay);
 void ps2_mmceman_prev_idx(bool delay);
 void ps2_mmceman_set_bootcard(bool delay);
+void ps2_mmceman_set_card(uint16_t cnum, bool delay);
+void ps2_mmceman_set_channel(uint16_t chn, bool delay);

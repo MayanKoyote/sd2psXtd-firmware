@@ -7,6 +7,7 @@
 #include "ps1_mc_data_interface.h"
 #include "ps1_mmce.h"
 #include "string.h"
+#include <settings.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -377,32 +378,32 @@ static void mc_read_controller(void) {
         if (IS_PRESSED(controller_in[1], HOTKEYS)) {
             if (prevCommand == 0) {
                 if (IS_PRESSED(controller_in[0], BTN_UP)) {
-                    prevCommand = MCP_NXT_CARD;
+                    prevCommand = MMCE_PS1_NXT_CARD;
                 } else if (IS_PRESSED(controller_in[0], BTN_DWN)) {
-                    prevCommand = MCP_PRV_CARD;
+                    prevCommand = MMCE_PS1_PRV_CARD;
                 } else if (IS_PRESSED(controller_in[0], BTN_LFT)) {
-                    prevCommand = MCP_PRV_CH;
+                    prevCommand = MMCE_PS1_PRV_CH;
                 } else if (IS_PRESSED(controller_in[0], BTN_RGT)) {
-                    prevCommand = MCP_NXT_CH;
+                    prevCommand = MMCE_PS1_NXT_CH;
                 } else if (IS_PRESSED(controller_in[0], BTN_SEL)) {
-                    prevCommand = MCP_SWITCH_BOOTCARD;
+                    prevCommand = MMCE_PS1_SWITCH_BOOTCARD;
                 }
             }
         } else if (prevCommand != 0){
             switch (prevCommand) {
-                case MCP_NXT_CARD:
+                case MMCE_PS1_NXT_CARD:
                     ps1_mmce_next_idx(false);
                     break;
-                case MCP_PRV_CARD:
+                case MMCE_PS1_PRV_CARD:
                     ps1_mmce_prev_idx(false);
                     break;
-                case MCP_NXT_CH:
+                case MMCE_PS1_NXT_CH:
                     ps1_mmce_next_ch(false);
                     break;
-                case MCP_PRV_CH:
+                case MMCE_PS1_PRV_CH:
                     ps1_mmce_prev_ch(false);
                     break;
-                case MCP_SWITCH_BOOTCARD:
+                case MMCE_PS1_SWITCH_BOOTCARD:
                     ps1_mmce_switch_bootcard(false);
                     break;
             }

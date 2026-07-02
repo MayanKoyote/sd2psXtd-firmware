@@ -3,13 +3,15 @@
 
 #include <stdint.h>
 
-#define MCP_GAME_ID     (1U)
-#define MCP_NXT_CH      (2U)
-#define MCP_PRV_CH      (3U)
-#define MCP_NXT_CARD    (4U)
-#define MCP_PRV_CARD    (5U)
-#define MCP_SWITCH_BOOTCARD (6U)
-#define MCP_SWITCH_DEFAULT  (7U)
+#define MMCE_PS1_GAME_ID     (1U)
+#define MMCE_PS1_NXT_CH      (2U)
+#define MMCE_PS1_PRV_CH      (3U)
+#define MMCE_PS1_NXT_CARD    (4U)
+#define MMCE_PS1_PRV_CARD    (5U)
+#define MMCE_PS1_SWITCH_BOOTCARD (6U)
+#define MMCE_PS1_SWITCH_DEFAULT  (7U)
+#define MMCE_PS1_SET_CARD    (8U)
+#define MMCE_PS1_SET_CHANNEL (9U)
 
 
 void ps1_memory_card_main(void);

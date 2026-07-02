@@ -416,6 +416,29 @@ void ps1_cardman_switch_default(void) {
     }
 }
 
+void ps1_cardman_set_idx(int idx) {
+    if (idx < PS1_CARD_IDX_SPECIAL)
+        idx = PS1_CARD_IDX_SPECIAL;
+
+    if (idx != card_idx) {
+        card_idx = idx;
+        card_chan = CHAN_MIN;
+        cardman_state = PS1_CM_STATE_NORMAL;
+        snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
+        needs_update = true;
+    }
+}
+
+void ps1_cardman_set_channel(int chn) {
+    if (chn < CHAN_MIN)
+        chn = CHAN_MIN;
+
+    if (chn != card_chan) {
+        card_chan = chn;
+        needs_update = true;
+    }
+}
+
 
 const char* ps1_cardman_get_folder_name(void) {
     return folder_name;

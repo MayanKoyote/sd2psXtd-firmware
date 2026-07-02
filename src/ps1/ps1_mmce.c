@@ -22,6 +22,8 @@
 #define log(level, fmt, x...) LOG_PRINT(LOG_LEVEL_PS1_MMCE, level, fmt, ##x)
 #endif
 static volatile uint8_t mmce_command;
+static volatile uint16_t mmce_cnum;
+static volatile uint16_t mmce_chn;
 static uint64_t mmce_switching_timeout = 0;
 
 static char received_game_id[MAX_GAME_ID_LENGTH];
@@ -31,36 +33,44 @@ void ps1_mmce_task(void) {
     if (mmce_command != 0U) {
 
         switch (mmce_command) {
-            case MCP_GAME_ID: {
+            case MMCE_PS1_GAME_ID: {
                 DPRINTF("Received Game ID: %s\n", received_game_id);
                 game_db_update_game(received_game_id);
                 game_db_get_current_parent(received_game_id);
                 ps1_cardman_set_game_id(received_game_id);
                 break;
             }
-            case MCP_NXT_CARD:
+            case MMCE_PS1_NXT_CARD:
                 DPRINTF("Received next card.\n");
                 ps1_cardman_next_idx();
                 break;
-            case MCP_PRV_CARD:
+            case MMCE_PS1_PRV_CARD:
                 DPRINTF("Received prev card.\n");
                 ps1_cardman_prev_idx();
                 break;
-            case MCP_NXT_CH:
+            case MMCE_PS1_NXT_CH:
                 DPRINTF("Received next chan.\n");
                 ps1_cardman_next_channel();
                 break;
-            case MCP_PRV_CH:
+            case MMCE_PS1_PRV_CH:
                 DPRINTF("Received prev chan.\n");
                 ps1_cardman_prev_channel();
                 break;
-            case MCP_SWITCH_BOOTCARD:
+            case MMCE_PS1_SWITCH_BOOTCARD:
                 DPRINTF("Received switch boot card.\n");
                 ps1_cardman_switch_bootcard();
                 break;
-            case MCP_SWITCH_DEFAULT:
+            case MMCE_PS1_SWITCH_DEFAULT:
                 DPRINTF("Received switch default card.\n");
                 ps1_cardman_switch_default();
+                break;
+            case MMCE_PS1_SET_CARD:
+                DPRINTF("Received set card index: %d\n", mmce_cnum);
+                ps1_cardman_set_idx(mmce_cnum);
+                break;
+            case MMCE_PS1_SET_CHANNEL:
+                DPRINTF("Received set channel index: %d\n", mmce_chn);
+                ps1_cardman_set_channel(mmce_chn);
                 break;
             default:
                 DPRINTF("Invalid ODE Command received.");
@@ -101,10 +111,10 @@ bool __time_critical_func(ps1_mmce_set_gameid)(const uint8_t* const game_id) {
     log(LOG_INFO, "Game ID: %s\n", sanitized_game_id);
     if (game_db_sanity_check_title_id(sanitized_game_id)) {
         snprintf(received_game_id, sizeof(received_game_id), "%s", sanitized_game_id);
-        mmce_command = MCP_GAME_ID;
+        mmce_command = MMCE_PS1_GAME_ID;
         ret = true;
     } else if ((game_id[0] != 0x00) && (ps1_cardman_get_idx() == PS1_CARD_IDX_SPECIAL)) {
-        mmce_command = MCP_SWITCH_DEFAULT;
+        mmce_command = MMCE_PS1_SWITCH_DEFAULT;
     }
     return ret;
 }
@@ -115,25 +125,37 @@ const char* ps1_mmce_get_gameid(void) {
 
 void ps1_mmce_next_ch(bool delay) {
     mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
-    mmce_command = MCP_NXT_CH;
+    mmce_command = MMCE_PS1_NXT_CH;
 }
 
 void ps1_mmce_prev_ch(bool delay) {
     mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
-    mmce_command = MCP_PRV_CH;
+    mmce_command = MMCE_PS1_PRV_CH;
 }
 
 void ps1_mmce_next_idx(bool delay) {
     mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
-    mmce_command = MCP_NXT_CARD;
+    mmce_command = MMCE_PS1_NXT_CARD;
 }
 
 void ps1_mmce_prev_idx(bool delay) {
     mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
-    mmce_command = MCP_PRV_CARD;
+    mmce_command = MMCE_PS1_PRV_CARD;
 }
 
 void ps1_mmce_switch_bootcard(bool delay) {
     mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
-    mmce_command = MCP_SWITCH_BOOTCARD;
+    mmce_command = MMCE_PS1_SWITCH_BOOTCARD;
+}
+
+void ps1_mmce_set_card(uint16_t cnum, bool delay) {
+    mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
+    mmce_cnum = cnum;
+    mmce_command = MMCE_PS1_SET_CARD;
+}
+
+void ps1_mmce_set_channel(uint16_t chn, bool delay) {
+    mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
+    mmce_chn = chn;
+    mmce_command = MMCE_PS1_SET_CHANNEL;
 }

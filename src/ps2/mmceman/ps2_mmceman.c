@@ -218,3 +218,18 @@ void ps2_mmceman_set_bootcard(bool delay) {
     mmceman_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
     mmceman_cmd = MMCEMAN_SWITCH_BOOTCARD;
 }
+
+
+void ps2_mmceman_set_card(uint16_t cnum, bool delay) {
+    mmceman_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
+    mmceman_cnum = cnum;
+    mmceman_mode = MMCEMAN_MODE_NUM;
+    mmceman_cmd = MMCEMAN_SET_CARD;
+}
+
+void ps2_mmceman_set_channel(uint16_t chn, bool delay) {
+    mmceman_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
+    mmceman_chn = chn;
+    mmceman_mode = MMCEMAN_MODE_NUM;
+    mmceman_cmd = MMCEMAN_SET_CHANNEL;
+}

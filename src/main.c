@@ -1,3 +1,4 @@
+#include <serial_input.h>
 #include <stdint.h>
 #include <stdio.h>
 #include "hardware/watchdog.h"
@@ -22,21 +23,14 @@
 #include "pico/time.h"
 #include "sd.h"
 #include "settings.h"
-#include "version/version.h"
 #if WITH_PSRAM
 #include "psram/psram.h"
 #endif
 
-#include "ps1/ps1_memory_card.h"
-#include "ps1/ps1_cardman.h"
 
 #include "ps2.h"
 #include "ps1.h"
 
-#include "card_emu/ps2_memory_card.h"
-#include "mmceman/ps2_mmceman.h"
-#include "mmceman/ps2_mmceman_commands.h"
-#include "ps2_cardman.h"
 
 
 #include "game_db/game_db.h"
@@ -60,9 +54,14 @@ static void check_bootloader_reset(void) {
 
 static void debug_task(void) {
 
-    for (int i = 0; i < 10; ++i) {
+    bool wrote_debug_output = false;
+    while (true) {
         char ch = debug_get();
         if (ch) {
+            if (!wrote_debug_output) {
+                serial_input_begin_output();
+            }
+            wrote_debug_output = true;
             #if DEBUG_USB_UART
                 putchar(ch);
             #else
@@ -75,60 +74,10 @@ static void debug_task(void) {
         }
     }
 #if DEBUG_USB_UART
-    int charin = getchar_timeout_us(0);
-    if ((charin != PICO_ERROR_TIMEOUT) && (charin > 0x20) && (charin < 0x7A)) {
-        QPRINTF("Got %c Input\n", charin);
-
-        char in[3] = {0};
-        in[0] = charin;
-        in[1] = getchar_timeout_us(1000*1000*3);
-        in[2] = getchar_timeout_us(1000*1000*3);
-        if (in[0] == 'b') {
-            if ((in[1] == 'l') && (in[2] == 'r')) {
-                QPRINTF("Resetting to Bootloader");
-                reset_usb_boot(0, 0);
-            }
-        } else if (in[0] == 'r') {
-            if ((in[1] == 'r') && (in[2] == 'r')) {
-                QPRINTF("Resetting");
-                watchdog_reboot(0, 0, 0);
-            }
-        } else if (in[0] == 'c') {
-            if ((in[1] == 'h') && (in[2] == '+')) {
-                DPRINTF("Received Channel Up!\n");
-                if (settings_get_mode(true) == MODE_PS2) {
-                    mmceman_mode = MMCEMAN_MODE_NEXT;
-                    mmceman_cmd = MMCEMAN_SET_CHANNEL;
-                }  else {
-                    ps1_mmce_next_ch(false);
-                }
-            } else if ((in[1] == 'h') && (in[2] == '-')) {
-                DPRINTF("Received Channel Down!\n");
-                if (settings_get_mode(true) == MODE_PS2) {
-                    mmceman_mode = MMCEMAN_MODE_PREV;
-                    mmceman_cmd = MMCEMAN_SET_CHANNEL;
-                } else {
-                    ps1_mmce_prev_ch(false);
-                }
-            } else if (in[1] == '+') {
-                DPRINTF("Received Card Up!\n");
-                if (settings_get_mode(true) == MODE_PS2) {
-                    mmceman_mode = MMCEMAN_MODE_NEXT;
-                    mmceman_cmd = MMCEMAN_SET_CARD;
-                } else {
-                    ps1_mmce_next_idx(false);
-                }
-            } else if (in[1] == '-') {
-                DPRINTF("Received Card Down!\n");
-                if (settings_get_mode(true) == MODE_PS2) {
-                    mmceman_mode = MMCEMAN_MODE_PREV;
-                    mmceman_cmd = MMCEMAN_SET_CARD;
-                } else {
-                    ps1_mmce_prev_idx(false);
-                }
-            }
-        }
+    if (wrote_debug_output) {
+        serial_input_notify_output();
     }
+    serial_input_process();
 #endif
 }
 
@@ -180,6 +129,9 @@ int main() {
             QPRINTF("Starting PS2 mode...\n");
             ps2_init();
             settings_load_sd();
+#if DEBUG_USB_UART == 0
+            stdio_usb_init();
+#endif
             do {
                 debug_task();
             } while(ps2_task());
@@ -189,10 +141,17 @@ int main() {
             QPRINTF("Starting PS1 mode...\n");
             ps1_init();
             settings_load_sd();
+
+#if DEBUG_USB_UART == 0
+            stdio_usb_init();
+#endif
             do {
                 debug_task();
             } while(ps1_task());
             ps1_deinit();
         }
+#if DEBUG_USB_UART == 0
+        stdio_usb_deinit();
+#endif
     }
 }

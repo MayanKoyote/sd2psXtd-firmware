@@ -24,6 +24,8 @@
 #include "ps1.h"
 
 #include "game_db/game_db.h"
+#include "version.h"
+
 
 uint flash_capacity = 0;
 uint flash_border = 0;

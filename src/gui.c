@@ -58,9 +58,9 @@ static struct {
 } auto_off_options[6];
 
 static struct {
-    uint8_t value;
+    uint16_t value;
     lv_obj_t *selection_lbl;
-} cardsize_options[7];
+} cardsize_options[8];
 
 static struct {
     uint8_t value;
@@ -514,7 +514,7 @@ static void evt_set_ps2_cardsize(lv_event_t *event) {
     uint8_t cardsize = (uint8_t)(intptr_t)event->user_data;
     settings_set_ps2_cardsize(cardsize);
 
-    char text[9] = {};
+    char text[10] = {};
     if (cardsize <= 8)
         snprintf(text, ARRAY_SIZE(text), "%u MB>", cardsize);
     else
@@ -894,6 +894,7 @@ static void create_menu_screen(void) {
             cardsize_options[4].value = 16;
             cardsize_options[5].value = 32;
             cardsize_options[6].value = 64;
+            cardsize_options[7].value = 128;
 
             for (size_t i = 0; i < ARRAY_SIZE(cardsize_options); i++) {
                 uint8_t value = cardsize_options[i].value;
@@ -963,7 +964,7 @@ static void create_menu_screen(void) {
         lv_obj_add_event_cb(cont, evt_do_civ_deploy, LV_EVENT_CLICKED, NULL);
 
         {
-            char text[9] = {};
+            char text[10] = {};
             if (settings_get_ps2_cardsize() <= 8)
                 snprintf(text, ARRAY_SIZE(text), "%u MB>", settings_get_ps2_cardsize());
             else

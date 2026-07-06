@@ -4,16 +4,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-
-#define PS2_CARD_SIZE_128M      (128 * 1024 * 1024)
-#define PS2_CARD_SIZE_64M       (64 * 1024 * 1024)
-#define PS2_CARD_SIZE_32M       (32 * 1024 * 1024)
-#define PS2_CARD_SIZE_16M       (16 * 1024 * 1024)
-#define PS2_CARD_SIZE_8M        (8 * 1024 * 1024)
-#define PS2_CARD_SIZE_4M        (4 * 1024 * 1024)
-#define PS2_CARD_SIZE_2M        (2 * 1024 * 1024)
-#define PS2_CARD_SIZE_1M        (1024 * 1024)
-#define PS2_CARD_SIZE_512K      (512 * 1024)
+#define PS2_CARD_SIZE_2G        (2048U * 1024U * 1024U)
+#define PS2_CARD_SIZE_1G        (1024U * 1024U * 1024U)
+#define PS2_CARD_SIZE_512M      (512U * 1024U * 1024U)
+#define PS2_CARD_SIZE_256M      (256U * 1024U * 1024U)
+#define PS2_CARD_SIZE_128M      (128U * 1024U * 1024U)
+#define PS2_CARD_SIZE_64M       (64U * 1024U * 1024U)
+#define PS2_CARD_SIZE_32M       (32U * 1024U * 1024U)
+#define PS2_CARD_SIZE_16M       (16U * 1024U * 1024U)
+#define PS2_CARD_SIZE_8M        (8U * 1024U * 1024U)
+#define PS2_CARD_SIZE_4M        (4U * 1024U * 1024U)
+#define PS2_CARD_SIZE_2M        (2U * 1024U * 1024U)
+#define PS2_CARD_SIZE_1M        (1024U * 1024U)
+#define PS2_CARD_SIZE_512K      (512U * 1024U)
 
 #define PS2_CARD_IDX_SPECIAL 0
 

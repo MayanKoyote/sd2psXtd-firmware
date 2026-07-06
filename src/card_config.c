@@ -69,6 +69,7 @@ static int parse_card_configuration(void *user, const char *section, const char 
             case 16:
             case 32:
             case 64:
+            case 128:
                 ctx->card_size = size;
                 break;
             default:

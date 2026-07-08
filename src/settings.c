@@ -81,11 +81,15 @@ static int parse_card_configuration(void *user, const char *section, const char 
         _s->ps1_flags ^= SETTINGS_PS1_FLAGS_CTRL_COMBO;
     } else if (MATCH("PS1", "MaxCardIdx")) {
          int maxcard = atoi(value);
-         if (maxcard > 0)
+         if (maxcard > 255)
+             _s->ps1_maxcardidx = 255;
+         else if (maxcard > 0)
              _s->ps1_maxcardidx = maxcard;
     } else if (MATCH("PS2", "MaxCardIdx")) {
          int maxcard = atoi(value);
-         if (maxcard > 0)
+         if (maxcard > 255)
+             _s->ps2_maxcardidx = 255;
+         else if (maxcard > 0)
             _s->ps2_maxcardidx = maxcard;
     } else if (MATCH("PS2", "Autoboot")
         && DIFFERS(value, ((_s->ps2_flags & SETTINGS_PS2_FLAGS_AUTOBOOT) > 0))) {
@@ -177,7 +181,7 @@ static void settings_serialize(void) {
         sd_mkdir("/.sd2psx/");
     }
 
-    fd = sd_open(settings_path, O_RDWR | O_CREAT);
+    fd = sd_open(settings_path, O_RDWR | O_CREAT | O_TRUNC);
     if (fd >= 0) {
         QPRINTF("Serializing Settings\n");
         char line_buffer[256] = { 0x0 };

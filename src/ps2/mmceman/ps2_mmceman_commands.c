@@ -195,7 +195,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 {
     uint8_t cmd;
     uint8_t gameid_len;
-    uint8_t received_id[252] = { 0 };
+    uint8_t received_id[256] = { 0 };
     mc_respond(0x0); receiveOrNextCmd(&cmd); //reserved byte
     mc_respond(0x0); receiveOrNextCmd(&cmd); //gameid length
     gameid_len = cmd;
@@ -1123,7 +1123,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
             do {
                 mc_respond(op_data->buffer[0][idx++]); receiveOrNextCmd(&cmd);
-            } while (op_data->buffer[0][idx] != 0x0);
+            } while (((size_t)idx < MMCEMAN_PATH_BUFFER_SIZE) && (op_data->buffer[0][idx] != 0x0));
 
             mc_respond(0x0); //Null term
         break;

@@ -78,9 +78,12 @@ static bool try_set_game_id_card() {
     card_idx = PS1_CARD_IDX_SPECIAL;
     card_chan = CHAN_MIN;
     cardman_state = PS1_CM_STATE_GAMEID;
+    memset(folder_name, 0, sizeof(folder_name));
     card_config_get_card_folder(parent_id, folder_name, sizeof(folder_name));
 
-    snprintf(folder_name, sizeof(folder_name), "%s", parent_id);
+    if (!folder_name[0])
+        snprintf(folder_name, sizeof(folder_name), "%s", parent_id);
+
 
     return true;
 }

@@ -84,7 +84,7 @@ static void cmd_data_init(serial_input_cmd_data_t* cmd_data) {
 }
 
 static void terminal_prompt(void) {
-    QPRINTF("%s", prompt);
+    printf("%s", prompt);
     prompt_started = true;
     prompt_needs_redraw = false;
 }
@@ -95,7 +95,7 @@ static void terminal_redraw_input_line(void) {
         return;
     }
 
-    QPRINTF("\r\n%s%s", prompt, in_buffer);
+    printf("\r\n%s%s", prompt, in_buffer);
     prompt_needs_redraw = false;
 }
 
@@ -105,7 +105,7 @@ static void terminal_erase_last_char(void) {
      * Backspace key.  Erase visually with ANSI cursor-left instead of \b so
      * terminals that don't treat BS as a cursor movement still redraw cleanly.
      */
-    QPRINTF("\x1b[D \x1b[D");
+    printf("\x1b[D \x1b[D");
 }
 
 void serial_input_notify_output(void) {
@@ -116,7 +116,7 @@ void serial_input_notify_output(void) {
 
 void serial_input_begin_output(void) {
     if (prompt_started) {
-        QPRINTF("\r\n");
+        printf("\r\n");
         prompt_started = false;
         prompt_needs_redraw = true;
     }
@@ -269,18 +269,18 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
         case SERIAL_INPUT_CMD_NONE:
             break;
         case SERIAL_INPUT_CMD_INVALID:
-            QPRINTF("%s\n", cmd_data->error ? cmd_data->error : "Invalid command");
+            printf("%s\n", cmd_data->error ? cmd_data->error : "Invalid command");
             break;
         case SERIAL_INPUT_CMD_RESET_TO_BOOTLOADER:
-            QPRINTF("Resetting to Bootloader\n");
+            printf("Resetting to Bootloader\n");
             reset_usb_boot(0, 0);
             break;
         case SERIAL_INPUT_CMD_RESET:
-            QPRINTF("Resetting\n");
+            printf("Resetting\n");
             watchdog_reboot(0, 0, 0);
             break;
         case SERIAL_INPUT_CMD_CHANNEL_UP:
-            QPRINTF("Channel Up\n");
+            printf("Channel Up\n");
             if (settings_get_mode(true) == MODE_PS2) {
                 ps2_mmceman_next_ch(false);
             } else {
@@ -288,7 +288,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             }
             break;
         case SERIAL_INPUT_CMD_CHANNEL_DOWN:
-            QPRINTF("Channel Down\n");
+            printf("Channel Down\n");
             if (settings_get_mode(true) == MODE_PS2) {
                 ps2_mmceman_prev_ch(false);
             } else {
@@ -296,7 +296,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             }
             break;
         case SERIAL_INPUT_CMD_CHANNEL_IDX:
-            QPRINTF("Set Channel Index: %d\n", cmd_data->idx);
+            printf("Set Channel Index: %d\n", cmd_data->idx);
             if (settings_get_mode(true) == MODE_PS2) {
                 ps2_mmceman_set_channel((uint16_t)cmd_data->idx, false);
             } else {
@@ -304,7 +304,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             }
             break;
         case SERIAL_INPUT_CMD_CARD_UP:
-            QPRINTF("Card Up\n");
+            printf("Card Up\n");
             if (settings_get_mode(true) == MODE_PS2) {
                 ps2_mmceman_next_idx(false);
             } else {
@@ -312,7 +312,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             }
             break;
         case SERIAL_INPUT_CMD_CARD_DOWN:
-            QPRINTF("Card Down\n");
+            printf("Card Down\n");
             if (settings_get_mode(true) == MODE_PS2) {
                 ps2_mmceman_prev_idx(false);
             } else {
@@ -320,7 +320,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             }
             break;
         case SERIAL_INPUT_CMD_CARD_IDX:
-            QPRINTF("Set Card Index: %d\n", cmd_data->idx);
+            printf("Set Card Index: %d\n", cmd_data->idx);
             if (settings_get_mode(true) == MODE_PS2) {
                 ps2_mmceman_set_card((uint16_t)cmd_data->idx, false);
                 if (cmd_data->channel >= 0) {
@@ -334,37 +334,37 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             }
             break;
         case SERIAL_INPUT_CMD_GAMEID:
-            QPRINTF("Set Game ID: %s\n", cmd_data->gameid);
+            printf("Set Game ID: %s\n", cmd_data->gameid);
             if (settings_get_mode(true) == MODE_PS2) {
                 if (!ps2_mmceman_set_gameid((const uint8_t*)cmd_data->gameid)) {
-                    QPRINTF("Invalid Game ID: %s\n", cmd_data->gameid);
+                    printf("Invalid Game ID: %s\n", cmd_data->gameid);
                 } else if (cmd_data->channel >= 0) {
                     ps2_mmceman_set_channel((uint16_t)cmd_data->channel, false);
                 }
             } else {
                 if (!ps1_mmce_set_gameid((const uint8_t*)cmd_data->gameid)) {
-                    QPRINTF("Invalid Game ID: %s\n", cmd_data->gameid);
+                    printf("Invalid Game ID: %s\n", cmd_data->gameid);
                 } else if (cmd_data->channel >= 0) {
                     ps1_mmce_set_channel((uint16_t)cmd_data->channel, false);
                 }
             }
             break;
         case SERIAL_INPUT_CMD_PS1_MODE:
-            QPRINTF("Set Mode: PS1\n");
+            printf("Set Mode: PS1\n");
             settings_set_mode(MODE_PS1);
             #if WITH_GUI
             gui_request_refresh();
             #endif
             break;
         case SERIAL_INPUT_CMD_PS2_MODE:
-            QPRINTF("Set Mode: PS2\n");
+            printf("Set Mode: PS2\n");
             settings_set_mode(MODE_PS2);
             #if WITH_GUI
             gui_request_refresh();
             #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_RETAIL:
-            QPRINTF("Set PS2 Variant: Retail\n");
+            printf("Set PS2 Variant: Retail\n");
             settings_set_ps2_variant(PS2_VARIANT_RETAIL);
             settings_set_mode(MODE_PS2);
             #if WITH_GUI
@@ -372,7 +372,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_PROTO:
-            QPRINTF("Set PS2 Variant: Proto\n");
+            printf("Set PS2 Variant: Proto\n");
             settings_set_ps2_variant(PS2_VARIANT_PROTO);
             settings_set_mode(MODE_PS2);
             #if WITH_GUI
@@ -380,7 +380,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_SC2:
-            QPRINTF("Set PS2 Variant: Conquest\n");
+            printf("Set PS2 Variant: Conquest\n");
             settings_set_ps2_variant(PS2_VARIANT_SC2);
             settings_set_mode(MODE_PS2);
             #if WITH_GUI
@@ -388,7 +388,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             #endif
             break;
         case SERIAL_INPUT_CMD_PS2_VARIANT_COH:
-            QPRINTF("Set PS2 Variant: Arcade\n");
+            printf("Set PS2 Variant: Arcade\n");
             settings_set_ps2_variant(PS2_VARIANT_COH);
             settings_set_mode(MODE_PS2);
             #if WITH_GUI
@@ -396,7 +396,7 @@ static void execute_command(const serial_input_cmd_data_t* cmd_data) {
             #endif
             break;
         case SERIAL_INPUT_CMD_HELP:
-            QPRINTF("%s", help_text);
+            printf("%s", help_text);
             break;
     }
 }
@@ -405,7 +405,7 @@ static void submit_line(void) {
     char parse_buffer[SERIAL_INPUT_BUFFER_SIZE];
     serial_input_cmd_data_t cmd_data;
 
-    QPRINTF("\r\n");
+    printf("\r\n");
 
     if (in_len == 0) {
         terminal_prompt();
@@ -450,9 +450,9 @@ void serial_input_process(void) {
             if (in_len < sizeof(in_buffer) - 1) {
                 in_buffer[in_len++] = (char)charin;
                 in_buffer[in_len] = '\0';
-                QPRINTF("%c", (char)charin);
+                printf("%c", (char)charin);
             } else {
-                QPRINTF("\a");
+                printf("\a");
             }
         }
 

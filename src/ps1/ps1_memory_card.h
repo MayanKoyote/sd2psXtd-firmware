@@ -12,6 +12,7 @@
 #define MMCE_PS1_SWITCH_DEFAULT  (7U)
 #define MMCE_PS1_SET_CARD    (8U)
 #define MMCE_PS1_SET_CHANNEL (9U)
+#define MMCE_PS1_RESET       (10U)
 
 
 void ps1_memory_card_main(void);

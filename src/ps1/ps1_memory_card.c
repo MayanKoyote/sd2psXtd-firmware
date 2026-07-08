@@ -282,6 +282,7 @@ static void __time_critical_func(mc_mmce_set_game_id)(void) {
         respondOrNextCmd(prev);   receiveOrNextCmd(&game_id[i]);
         prev = game_id[i];
     }
+    game_id[length == UINT8_MAX ? UINT8_MAX - 1 : length] = 0x00;
 
     ps1_mmce_set_gameid(game_id);
 }
@@ -320,6 +321,15 @@ static void __time_critical_func(mc_mmce_next_index)(void) {
     respondOrNextCmd(0x20);   receiveOrNextCmd(&_);
     respondOrNextCmd(0xFF);   receiveOrNextCmd(&_);
     ps1_mmce_next_idx(false);
+}
+
+static void __time_critical_func(mc_mmce_reset)(void) {
+    uint8_t _;
+    respondOrNextCmd(0x00);   receiveOrNextCmd(&_);
+    respondOrNextCmd(0x00);   receiveOrNextCmd(&_);
+    respondOrNextCmd(0x20);   receiveOrNextCmd(&_);
+    respondOrNextCmd(0xFF);   receiveOrNextCmd(&_);
+    ps1_mmce_reset(false);
 }
 
 /**
@@ -452,6 +462,7 @@ static void __time_critical_func(mc_main_loop)(void) {
                 case 0x23: mc_mmce_next_channel(); break;
                 case 0x24: mc_mmce_prev_index(); break;
                 case 0x25: mc_mmce_next_index(); break;
+                case 0x27: mc_mmce_reset(); break;
                 case 'B': mc_cmd_read(true); break;
                 case 'R': mc_cmd_read(false); break;
                 case 'S': mc_cmd_get_card_id(); break;

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "pico/multicore.h"
 #include "ps1_mc_data_interface.h"
+#include "debug.h"
 
 #if WITH_LED
 #include "led.h"
@@ -48,7 +49,7 @@ static void ps1_update_buttons(void) {
 #endif
 
 void ps1_init() {
-    printf("starting in PS1 mode\n");
+    QPRINTF("starting in PS1 mode\n");
 
     ps1_cardman_init();
     ps1_dirty_init();
@@ -59,7 +60,7 @@ void ps1_init() {
 
     multicore_launch_core1(ps1_memory_card_main);
 
-    printf("Starting memory card... ");
+    QPRINTF("Starting memory card... ");
     uint64_t start = time_us_64();
 #if WITH_GUI
     gui_do_ps1_card_switch();
@@ -67,7 +68,7 @@ void ps1_init() {
     ps1_cardman_open();
     ps1_memory_card_enter();
     uint64_t end = time_us_64();
-    printf("DONE! (%d us)\n", (int)(end - start));
+    QPRINTF("DONE! (%d us)\n", (int)(end - start));
 }
 
 bool ps1_task() {

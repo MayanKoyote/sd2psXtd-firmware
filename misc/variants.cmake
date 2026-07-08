@@ -25,8 +25,6 @@ if (VARIANT STREQUAL "SD2PSX")
                             "SD_MOSI=27"
                             "SD_SCK=26"
                             "SD_CS=29"
-                            "FLASH_OFF_CIV=0x7fb000"
-                            "FLASH_OFF_EEPROM=0x7fc000"
                             "MMCE_PRODUCT_ID=0x1"
                             )
     set(SD2PSX_WITH_GUI TRUE)
@@ -49,8 +47,6 @@ elseif( VARIANT STREQUAL "PMC+")
                             "SD_MOSI=19"
                             "SD_SCK=18"
                             "SD_CS=17"
-                            "FLASH_OFF_CIV=0x1fb000"
-                            "FLASH_OFF_EEPROM=0x1fc000"
                             "MMCE_PRODUCT_ID=0x3"
                             "PMC_BUTTONS=1"
                             "PIN_BTN_LEFT=27"
@@ -77,8 +73,6 @@ elseif( VARIANT STREQUAL "PSXMemCard")
                             "SD_MOSI=19"
                             "SD_SCK=18"
                             "SD_CS=17"
-                            "FLASH_OFF_CIV=0x1fb000"
-                            "FLASH_OFF_EEPROM=0x1fc000"
                             "MMCE_PRODUCT_ID=0x3"
                             )
     set(SD2PSX_WITH_GUI FALSE)
@@ -101,8 +95,6 @@ elseif( VARIANT STREQUAL "PMCZero")
                             "SD_MOSI=3"
                             "SD_SCK=2"
                             "SD_CS=1"
-                            "FLASH_OFF_CIV=0x1fb000"
-                            "FLASH_OFF_EEPROM=0x1fc000"
                             "MMCE_PRODUCT_ID=0x4"
                             "PMC_BUTTONS=1"
                             "PIN_BTN_LEFT=27"
@@ -130,8 +122,6 @@ elseif( VARIANT STREQUAL "SD2PSXlite")
                             "SD_MOSI=27"
                             "SD_SCK=26"
                             "SD_CS=29"
-                            "FLASH_OFF_CIV=0x1fb000"
-                            "FLASH_OFF_EEPROM=0x1fc000"
                             "MMCE_PRODUCT_ID=0x1"
                             PARENT_DIRECTORY)
     set(SD2PSX_WITH_GUI FALSE)

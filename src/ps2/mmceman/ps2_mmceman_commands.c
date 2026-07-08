@@ -26,8 +26,44 @@
 #define log(level, fmt, x...) LOG_PRINT(LOG_LEVEL_MMCEMAN, level, fmt, ##x)
 #endif
 
+#define MMCEMAN_PATH_BUFFER_SIZE (sizeof(((ps2_mmceman_fs_op_data_t *)0)->buffer[0]))
+
 //TODO: temp global values, find them a home
 volatile ps2_mmceman_fs_op_data_t *op_data = NULL;
+
+static bool __time_critical_func(ps2_mmceman_receive_path)(volatile uint8_t *buffer, size_t buffer_size)
+{
+    uint8_t cmd = 0;
+    size_t idx = 0;
+
+    if (buffer_size == 0) {
+        return false;
+    }
+
+    while (idx < (buffer_size - 1)) {
+        mc_respond(0x0);
+        if (receive(&cmd) == RECEIVE_RESET) {
+            DPRINTF("Reset at %s:%u", __func__, __LINE__);
+            return false;
+        }
+        buffer[idx++] = cmd;
+        if (cmd == 0x0) {
+            return true;
+        }
+    }
+
+    buffer[buffer_size - 1] = 0x0;
+
+    do {
+        mc_respond(0x0);
+        if (receive(&cmd) == RECEIVE_RESET) {
+            DPRINTF("Reset at %s:%u", __func__, __LINE__);
+            return false;
+        }
+    } while (cmd != 0x0);
+
+    return false;
+}
 
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_ping)(void)
 {
@@ -110,7 +146,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
     mc_respond(chan & 0xff); receiveOrNextCmd(&cmd); //channel lower 8 bits
     mc_respond(term);
 
-    log(LOG_INFO, "received MMCEMAN_GET_CHANNEL\n");
+    log(LOG_INFO, "received MMCEMAN_GET_CHANNEL - %i\n", chan);
 }
 
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_set_channel)(void)
@@ -120,12 +156,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
     mc_respond(0x0); receiveOrNextCmd(&cmd); //mode
     mmceman_mode = cmd;
     mc_respond(0x0); receiveOrNextCmd(&cmd); //channel upper 8 bits
-    mmceman_cnum = cmd << 8;
+    mmceman_chn = cmd << 8;
     mc_respond(0x0); receiveOrNextCmd(&cmd); //channel lower 8 bits
-    mmceman_cnum |= cmd;
+    mmceman_chn |= cmd;
     mc_respond(term);
 
-    log(LOG_INFO, "received MMCEMAN_SET_CHANNEL mode: %i, num: %i\n", mmceman_mode, mmceman_cnum);
+    log(LOG_INFO, "received MMCEMAN_SET_CHANNEL mode: %i, num: %i\n", mmceman_mode, mmceman_chn);
 
     mmceman_cmd = MMCEMAN_SET_CHANNEL;  //set after setting mode and cnum
 }
@@ -159,7 +195,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 {
     uint8_t cmd;
     uint8_t gameid_len;
-    uint8_t received_id[252] = { 0 };
+    uint8_t received_id[256] = { 0 };
     mc_respond(0x0); receiveOrNextCmd(&cmd); //reserved byte
     mc_respond(0x0); receiveOrNextCmd(&cmd); //gameid length
     gameid_len = cmd;
@@ -206,12 +242,39 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
     log(LOG_INFO, "received MMCEMAN_RESET\n");
 }
 
+
+inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_set_card_channel)(void)
+{
+    uint8_t cmd;
+    uint8_t type;
+
+    mc_respond(0x0); receiveOrNextCmd(&cmd); //reserved byte
+    mc_respond(0x0); receiveOrNextCmd(&cmd); //type (unused?)
+    type = cmd;
+    mc_respond(0x0); receiveOrNextCmd(&cmd); //card upper 8 bits
+    mmceman_cnum = cmd << 8;
+    mc_respond(0x0); receiveOrNextCmd(&cmd); //card lower 8 bits
+    mmceman_cnum |= cmd;
+    mc_respond(0x0); receiveOrNextCmd(&cmd); //channel upper 8 bits
+    mmceman_chn = cmd << 8;
+    mc_respond(0x0); receiveOrNextCmd(&cmd); //channel lower 8 bits
+    mmceman_chn |= cmd;
+    mc_respond(term);
+
+
+    log(LOG_INFO, "received MMCEMAN_SET_CARD_CHANNEL type: %i, card: %i, chan: %i\n", type, mmceman_cnum, mmceman_chn);
+    if (type == 1) {
+        log(LOG_INFO, "received MMCEMAN_SET_CARD_CHANNEL BOOTCARD\n");
+        mmceman_cnum = 0;
+    }
+    mmceman_cmd = MMCEMAN_SET_CARD_CHANNEL;  //set after setting mode and cnum
+}
+
+
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_open)(void)
 {
     uint8_t cmd;
     uint8_t packed_flags;
-
-    int idx = 0;
 
     switch(mmceman_transfer_stage)
     {
@@ -240,10 +303,17 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->fd = -1;
+                mmceman_transfer_stage = 0;
+                ps2_mmceman_set_cb(NULL);
+                mc_respond(0x1);
+                mmceman_op_in_progress = false;
+                MP_CMD_END();
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s flags: 0x%x\n", __func__, (const char*)op_data->buffer, op_data->flags);
 
@@ -532,6 +602,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
             mc_respond(0x0); receiveOrNextCmd(&len8[0x1]);             //Len MSB - 2
             mc_respond(0x0); receiveOrNextCmd(&len8[0x0]);             //Len MSB - 3
 
+            log(LOG_INFO, "%s, Mode: %i\n", __func__, cmd);
             log(LOG_INFO, "%s: fd: %i, len %u\n", __func__, op_data->fd, op_data->length);
 
             //Check if fd is valid before continuing
@@ -630,6 +701,8 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
             mc_respond(bytes8[0x1]); receiveOrNextCmd(&cmd);
             mc_respond(bytes8[0x0]); receiveOrNextCmd(&cmd);
 
+            log(LOG_INFO, "%s: written: %u\n", __func__, op_data->bytes_written);
+
             mc_respond(term);
 
             mmceman_op_in_progress = false;
@@ -702,7 +775,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_remove)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: Command and padding
@@ -724,10 +796,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
 
@@ -758,7 +832,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_mkdir)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: Command and padding
@@ -780,10 +853,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
             MP_SIGNAL_OP();
@@ -813,7 +888,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_rmdir)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: Command and padding
@@ -835,10 +909,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         //Packet #2: Filename
         case 1:
             mmceman_transfer_stage = 2;
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
 
@@ -868,7 +944,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_dopen)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage)
     {
@@ -892,10 +967,11 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
         case 1:
             mmceman_transfer_stage = 2;
 
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->fd = -1;
+                break;
+            }
 
             log(LOG_INFO, "%s: name: %s\n", __func__, (const char*)op_data->buffer);
 
@@ -1047,7 +1123,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
             do {
                 mc_respond(op_data->buffer[0][idx++]); receiveOrNextCmd(&cmd);
-            } while (op_data->buffer[0][idx] != 0x0);
+            } while (((size_t)idx < MMCEMAN_PATH_BUFFER_SIZE) && (op_data->buffer[0][idx] != 0x0));
 
             mc_respond(0x0); //Null term
         break;
@@ -1071,7 +1147,6 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_getstat)(void)
 {
     uint8_t cmd;
-    int idx = 0;
 
     switch(mmceman_transfer_stage) {
         //Packet #1: File descriptor
@@ -1092,10 +1167,12 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
         //Packet #2: Name
         case 1:
-            do {
-                mc_respond(0x0); receiveOrNextCmd(&cmd);
-                op_data->buffer[0][idx++] = cmd;
-            } while (cmd != 0x0);
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = 1;
+                mmceman_transfer_stage = 2;
+                break;
+            }
 
             op_data->flags = 0; //RD_ONLY
             ps2_mmceman_fs_signal_operation(MMCEMAN_FS_OPEN);
@@ -1149,7 +1226,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
             mc_respond(op_data->rv);
 
-            if (op_data->fd > 0) {
+            if (op_data->fd >= 0) {
                 ps2_mmceman_fs_signal_operation(MMCEMAN_FS_CLOSE);
                 ps2_mmceman_fs_wait_ready();
             }
@@ -1234,6 +1311,73 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_
 
     mmceman_op_in_progress = false;
     MP_CMD_END();
+}
+
+inline __attribute__((always_inline)) void __time_critical_func(ps2_mmceman_cmd_fs_rename)(void)
+{
+    uint8_t cmd;
+
+    switch(mmceman_transfer_stage)
+    {
+        //Packet #1: Command and flags
+        case 0:
+            MP_CMD_START();
+            mmceman_op_in_progress = true;
+
+            ps2_mmceman_fs_wait_ready();            //Wait for file handling to be ready
+            op_data = ps2_mmceman_fs_get_op_data();    //Get pointer to mmce fs op_data
+
+            mc_respond(0x0); receiveOrNextCmd(&cmd);            //Reserved byte
+
+            //Jump to this function after /CS triggered reset
+            ps2_mmceman_set_cb(&ps2_mmceman_cmd_fs_rename);
+
+            mmceman_transfer_stage = 1; //Update stage
+            mc_respond(0xff);   //End transfer
+        break;
+
+        //Packet #2: Filename
+        case 1:
+            mmceman_transfer_stage = 2;
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[0], sizeof(op_data->buffer[0]))) {
+                log(LOG_ERROR, "%s: old filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                mmceman_transfer_stage = 3;
+                break;
+            }
+            //Signal op in core1 (ps2_mmceman_fs_run)
+        break;
+
+        //Packet #3: New filename
+        case 2:
+            mmceman_transfer_stage = 3;
+
+            if (!ps2_mmceman_receive_path(op_data->buffer[1], sizeof(op_data->buffer[1]))) {
+                log(LOG_ERROR, "%s: new filename exceeded %u bytes\n", __func__, (unsigned)MMCEMAN_PATH_BUFFER_SIZE - 1);
+                op_data->rv = -1;
+                break;
+            }
+
+            MP_SIGNAL_OP();
+            ps2_mmceman_fs_signal_operation(MMCEMAN_FS_RENAME);
+        break;
+
+        //Packet #4: Final package
+        case 3:
+            ps2_mmceman_fs_wait_ready();//Wait ready up to 1s
+
+            mmceman_transfer_stage = 0;
+            ps2_mmceman_set_cb(NULL);
+
+            mc_respond(op_data->rv);
+            log(LOG_INFO, "%s: rv: %i\n", __func__, op_data->rv);
+            mc_respond(term);
+
+            mmceman_op_in_progress = false;
+            MP_CMD_END();
+        break;
+    }
 }
 
 //Used only by MMCEDRV atm

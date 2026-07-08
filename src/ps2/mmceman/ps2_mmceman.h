@@ -21,6 +21,7 @@ extern volatile bool mmceman_fs_abort_read;
 extern volatile uint8_t mmceman_cmd;
 extern volatile uint8_t mmceman_mode;
 extern volatile uint16_t mmceman_cnum;
+extern volatile uint16_t mmceman_chn;
 extern char mmceman_gameid[251];
 
 void ps2_mmceman_task(void);
@@ -36,3 +37,5 @@ void ps2_mmceman_prev_ch(bool delay);
 void ps2_mmceman_next_idx(bool delay);
 void ps2_mmceman_prev_idx(bool delay);
 void ps2_mmceman_set_bootcard(bool delay);
+void ps2_mmceman_set_card(uint16_t cnum, bool delay);
+void ps2_mmceman_set_channel(uint16_t chn, bool delay);

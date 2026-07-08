@@ -66,32 +66,51 @@ static void ps2_mc_data_interface_invalidate_read(void);
 
 
 static inline void __time_critical_func(push_op)(volatile ps2_mcdi_page_t* op) {
-    while (queue_full) {log(LOG_INFO, "_");};
-    critical_section_enter_blocking(&crit);
-    switch (op->page_state) {
-        case PAGE_READ_REQ:
-        case PAGE_READ_AHEAD_REQ:
-            read_count++;
-            break;
-        case PAGE_WRITE_REQ:
-            write_count++;
-            break;
-        case PAGE_ERASE_REQ:
-            erase_count++;
-            break;
-        default:
-        break;
+    while (true) {
+        critical_section_enter_blocking(&crit);
+        if (!queue_full) {
+            switch (op->page_state) {
+                case PAGE_READ_REQ:
+                case PAGE_READ_AHEAD_REQ:
+                    read_count++;
+                    break;
+                case PAGE_WRITE_REQ:
+                    write_count++;
+                    break;
+                case PAGE_ERASE_REQ:
+                    erase_count++;
+                    break;
+                default:
+                    break;
+            }
+            ops[ops_head] = op;
+            ops_head = (ops_head + 1) % PAGE_CACHE_SIZE;
+            queue_full = (ops_head == ops_tail);
+            delay_reuired = true;
+            critical_section_exit(&crit);
+            return;
+        }
+        critical_section_exit(&crit);
+        tight_loop_contents();
     }
-    ops[ops_head] = op;
-    ops_head = ( ops_head + 1 ) % PAGE_CACHE_SIZE;
-    queue_full = (ops_head == ops_tail);
-    delay_reuired = true;
-    critical_section_exit(&crit);
 }
 
 static inline volatile ps2_mcdi_page_t* __time_critical_func(pop_op)(void) {
     critical_section_enter_blocking(&crit);
+    if ((ops_head == ops_tail) && !queue_full) {
+        critical_section_exit(&crit);
+        return NULL;
+    }
+
     volatile ps2_mcdi_page_t* ptr = ops[ops_tail];
+    if (!ptr) {
+        ops_head = ops_tail = 0;
+        queue_full = false;
+        critical_section_exit(&crit);
+        return NULL;
+    }
+
+    ops[ops_tail] = NULL;
         switch (ptr->page_state) {
         case PAGE_READ_REQ:
         case PAGE_READ_AHEAD_REQ:
@@ -420,6 +439,7 @@ static void __time_critical_func (ps2_mc_data_interface_invalidate_read)(void) {
 
 // Core 0
 void ps2_mc_data_interface_card_changed(void) {
+    critical_section_enter_blocking(&crit);
     for(int i = 0; i < READ_CACHE; i++) {
         readpages[i].page_state = PAGE_EMPTY;
         readpages[i].page = 0;
@@ -443,6 +463,10 @@ void ps2_mc_data_interface_card_changed(void) {
     erase_count = 0;
     write_occured = false;
     delay_reuired = false;
+    queue_full = false;
+    ops_head = 0;
+    ops_tail = 0;
+    critical_section_exit(&crit);
 
     log(LOG_INFO, "%s Done\n", __func__);
 }

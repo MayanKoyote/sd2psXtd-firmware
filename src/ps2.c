@@ -53,6 +53,8 @@ static void ps2_update_buttons(void) {
 }
 #endif
 
+static int ps2_variant = PS2_VARIANT_RETAIL;
+
 void ps2_init(void) {
     log(LOG_INFO, "starting in PS2 mode\n");
     mmceman_mcman_retry_counter = 0;
@@ -83,6 +85,8 @@ void ps2_init(void) {
 #endif
     uint64_t end = time_us_64();
     log(LOG_INFO, "DONE! (%d us)\n", (int)(end - start));
+
+    ps2_variant = settings_get_ps2_variant();
 }
 
 bool ps2_task(void) {
@@ -123,7 +127,8 @@ bool ps2_task(void) {
         keystore_confirm();
     }
 
-    if ((settings_get_mode(true) == MODE_PS1)
+    if (((settings_get_mode(true) == MODE_PS1)
+            || ps2_variant != settings_get_ps2_variant())
         && (ps2_cardman_is_idle())
         && !ps2_history_tracker_needs_refresh())
         return false;

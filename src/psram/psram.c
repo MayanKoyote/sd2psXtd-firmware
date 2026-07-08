@@ -114,7 +114,7 @@ static void psram_run_tests(void) {
     uint64_t start = time_us_64();
 
     for (size_t test = 0; test < NUM_TESTS; ++test) {
-        printf("Start PSRAM test %d\n", test);
+        QPRINTF("Start PSRAM test %d\n", test);
         psram_tests[test](buf_write);
 
         uint32_t addr = 0;
@@ -128,7 +128,7 @@ static void psram_run_tests(void) {
             psram_wait_for_dma();
 
             if (memcmp(buf_write, buf_read, TEST_BLOCK_SIZE) != 0) {
-                printf("test %d cycle %d\n", test, i);
+                QPRINTF("test %d cycle %d\n", test, i);
                 fatal(ERR_PSRAM, "PSRAM failed test");
             }
 
@@ -137,7 +137,7 @@ static void psram_run_tests(void) {
     }
 
     uint64_t end = time_us_64();
-    printf("PSRAM passed all tests -- took %.2f ms -- avg speed %.2f kB/s\n",
+    QPRINTF("PSRAM passed all tests -- took %.2f ms -- avg speed %.2f kB/s\n",
         (end - start) / 1000.0,
         1000000.0 * (NUM_TESTS * TEST_CYCLES * TEST_BLOCK_SIZE * 2) / (end - start) / 1024);
 }

@@ -31,7 +31,7 @@ void __not_in_flash_func(keystore_backup)(void) {
 void keystore_init(void) {
     keystore_read();
     if (ps2_magicgate == 0) {
-        printf("Deploying keys...\n");
+        DPRINTF("Deploying keys...\n");
         keystore_deploy();
 #if WITH_GUI==0
         if (!ps2_magicgate)
@@ -46,13 +46,13 @@ void keystore_read(void) {
     for (int i = 0; i < 8; ++i) {
         uint8_t chk = ~buf[i + 8];
         if (buf[i] != chk) {
-            printf("keystore - No CIV key deployed\n");
+            DPRINTF("keystore - No CIV key deployed\n");
             return;
         }
     }
 
-    printf("keystore - Found valid CIV : %02X %02X ... - activating magicgate\n", buf[0], buf[1]);
-    printf("keystore - MagicGate is %s\n", (buf[16] == 0x01) ? "confirmed" : "unconfirmed");
+    DPRINTF("keystore - Found valid CIV : %02X %02X ... - activating magicgate\n", buf[0], buf[1]);
+    DPRINTF("keystore - MagicGate is %s\n", (buf[16] == 0x01) ? "confirmed" : "unconfirmed");
     memcpy(ps2_civ, buf, sizeof(ps2_civ));
     is_confirmed = (buf[16] == 0x01);
     ps2_magicgate = 1;
@@ -77,8 +77,6 @@ int __not_in_flash_func(keystore_deploy)(void) {
     uint8_t civbuf[8] = { 0 };
     uint8_t chkbuf[256] = { 0 };
     const char* path;
-
-    sd_init();
 
     if (sd_exists(civ_path))
         path = civ_path;
@@ -110,7 +108,7 @@ int __not_in_flash_func(keystore_deploy)(void) {
         if (multicore_lockout_victim_is_initialized(1))
             multicore_lockout_end_blocking();
     } else {
-        printf("keystore - skipping CIV flash because data is unchanged\n");
+        DPRINTF("keystore - skipping CIV flash because data is unchanged\n");
     }
 
     sd_remove(path);
@@ -124,7 +122,7 @@ int __not_in_flash_func(keystore_deploy)(void) {
 
 void __not_in_flash_func(keystore_confirm)(void) {
     if (!is_confirmed) {
-        printf("keystore - Confirming CIV\n");
+        DPRINTF("keystore - Confirming CIV\n");
         uint8_t chkbuf[256] = { 0 };
         memcpy(chkbuf, ps2_civ, sizeof(ps2_civ));
         for (int i = 0; i < 8; ++i)
@@ -145,9 +143,9 @@ void __not_in_flash_func(keystore_confirm)(void) {
 
 void __not_in_flash_func(keystore_reset)(void) {
     if (!is_confirmed) {
-        printf("keystore - Resetting unconfirmed CIV\n");
+        DPRINTF("keystore - Resetting unconfirmed CIV\n");
         uint8_t chkbuf[256] = { 0 };
-        printf("keystore - Resetting CIV\n");
+        DPRINTF("keystore - Resetting CIV\n");
         ps2_magicgate = 0;
 
         if (multicore_lockout_victim_is_initialized(1))

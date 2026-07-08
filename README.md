@@ -11,7 +11,7 @@ It provides the same functionality as the official stable firmware and extends i
 - **PS2:** PS1 dynamic mode selection
 - **PS2:** MMCEMAN and MMCEDRV support
 - **PS2:** Instant card availability
-- **PS2:** 1-64 MB card size support
+- **PS2:** 1-128 MB card size support
 - **PS2:** Support for developer (`DTL-H` & `DTL-T`), Arcade (`COH-H`) and Prototype (`EB`?) models is available.
 - **PS1:** BootCard mechanics
 - **PS1:** PSRAM support
@@ -24,6 +24,7 @@ It provides the same functionality as the official stable firmware and extends i
 - **General:** Game2Folder mapping
 - **General:** Splash Screen
 - **General:** Game Image Screen
+- **General:** USB-CDC command interface
 
 ## PS2: Game ID Switching
 
@@ -65,9 +66,9 @@ While in general this should be safe behavior, if *sd2psx* is used mainly in PS1
 If using 8MB cards, *sd2psXtd* firmware exposes the card to the PS2 while it is still being transferred to PSRAM. This enables using FMCB/PS2BBL at boot time without additional waiting scripts.
 Very helpful for PlayStation 2 models with simpler OSDSYS programs, that result on faster boot times (like PSX DESR and Arcade PS2)
 
-## PS2: 1-64 MB Card Size Support
+## PS2: 1-128 MB Card Size Support
 
-Support for card sizes between 1 and 64 MB has been added. Cards larger than 8 MB rely heavily on quick SD card access, so on older or lower-quality SD cards, these larger cards may become corrupt.
+Support for card sizes between 1 and 128 MB has been added. Cards larger than 8 MB rely heavily on quick SD card access, so on older or lower-quality SD cards, these larger cards may become corrupt.
 
 > [!NOTE]
 >  While the feature has been extensively tested, it is still recommended to use 8MB cards, as this is the official specification for memory cards.
@@ -109,6 +110,8 @@ The following button combinations are used to perform card and channel switches:
 
 These mappings require that all four buttons (L1, R1, L2, R2) are held down in combination with one of the directional inputs.
 
+The Controller Combos can be activated by a setting in the PS1 Settings menu.
+
 ## PS1: Super fast FreePSXBoot
 
 *sd2psXtd* allows super fast booting of FreePSXBoot by using some non standard card communication.
@@ -117,6 +120,29 @@ Please note: This is only possible using a special FreePSXBoot Version provided 
 ## PS1: Net Yaroze Support
 
 *sd2psXtd* will act as a Net Yaroze Access Card, if used with the Net Yaroze Software.
+
+## General: USB-CDC Command Interface
+
+When the firmware is running, the device exposes a USB-CDC serial interface that accepts simple text commands. This can be used to change cards, channels, modes, PS2 variants, or to reboot the device without using the on-device controls.
+
+Commands are lowercase and submitted with Enter:
+
+```text
+help
+reset bl
+reset dev
+channel up
+channel down
+set channel <idx>
+card up
+card down
+set card <idx> [channel <idx>]
+set game <id> [channel <idx>]
+set mode <ps1|ps2>
+set variant <retail|proto|conquest|arcade>
+```
+
+`reset bl` resets to the bootloader. `reset dev` restarts the firmware. Card, channel, and game commands affect the currently active mode. Setting a PS2 variant also switches the device to PS2 mode.
 
 
 ## General: Settings File
@@ -132,11 +158,14 @@ FlippedScreen=OFF
 [PS1]
 Autoboot=ON
 GameID=ON
+EnableControllerCombo=ON
+MaxCardIdx=0
 [PS2]
 Autoboot=ON
 GameID=ON
 CardSize=16
 Variant=RETAIL
+MaxCardIdx=0
 ```
 
 Possible values are:
@@ -146,9 +175,11 @@ Possible values are:
 | Mode          | `PS1`, `PS2`                          |
 | AutoBoot      | `OFF`, `ON`                           |
 | GameID        | `OFF`, `ON`                           |
-| CardSize      | `1`, `2`, `4`, `8`, `16`, `32`, `64`  |
-| Variant       | `RETAIL`, `PROTO`, `ARCADE`, `ARCADE2`|
+| CardSize      | `1`, `2`, `4`, `8`, `16`, `32`, `64`, `128` |
+| Variant       | `RETAIL`, `PROTO`, `ARCADE`, `CONQUEST`     |
 | FlippedScreen | `ON`, `OFF`                           |
+| EnableControllerCombo | `ON`, `OFF`                   |
+| MaxCardIdx    | UINT8                                 |
 
 *Note: Make sure there is an empty line at the end of the ini file.*
 
@@ -225,6 +256,8 @@ From there, you can customize a splash screen to your needs. Once you are happy 
 
 You can flash this splash screen just like any other firmware update.
 
+Alternatively, place a generated `splash.bin` in the root of the SD card. On startup, the firmware imports it into flash and removes `splash.bin` from the SD card.
+
 The flashed splash screen is maintained after a firmware update, so you probably only need to upload it once.
 
 *Note: When combining the splash screen with a firmware UF2 (such as for mass production or flashing multiple sd2psXtd with the same splash and firmware combination), it's strongly recommended to flash the combined image with `picotool`, since uploading using the usual firmware update procedure often does not work. To do so, please install `picotool` and run:*
@@ -255,7 +288,7 @@ Naming and behavior:
 Practical notes
 - `<channel_number>` matches the on-device channel index (1..N).
 - Filenames must match exactly; FAT SD cards are usually case-insensitive but keep names consistent.
-- Use `misc/splashgen.html` to produce correctly-sized and packed `.bin` files for the OLED.
+- Use `misc/splashgen/splashgen.html` to produce correctly-sized and packed `.bin` files for the OLED.
 - Keep names short — very long filenames may cause display or performance issues.
 - Store splash `.bin` files alongside that card's `CardX.ini` and save data in the same folder.
 
@@ -270,3 +303,4 @@ Practical notes
 - **@Mena / PhenomMods**: for providing hardware to some team members ❤️
 - **BitFunX**: for providing PSXMemcard and PSXMemcard Gen2 Hardware for dev ❤️
 - **All Testers**: ripto, Vapor, seewood, john3d, rippenbiest, ... ❤️
+- **@niemasd**: For his [*GameDB-PSX*](https://github.com/niemasd/GameDB-PSX) database - Game naming and ID on PS1 would not be possible without it! ❤️

@@ -1,6 +1,7 @@
 #include "ps1_dirty.h"
 #include "ps1_cardman.h"
 #include "ps1_mc_data_interface.h"
+#include "debug.h"
 #ifdef WITH_PSRAM
 #include <psram/psram.h>
 #endif
@@ -109,12 +110,12 @@ void ps1_dirty_task(void) {
 
         ++hit;
 
-        printf("ps1 - write sector %d\n", sector);
+        QPRINTF("ps1 - write sector %d\n", sector);
 
         if (ps1_cardman_write_sector(sector, flushbuf) != 0) {
             // TODO: do something if we get too many errors?
             // for now lets push it back into the heap and try again later
-            printf("!! writing sector 0x%x failed\n", sector);
+            QPRINTF("!! writing sector 0x%x failed\n", sector);
 
             ps1_dirty_lock();
             ps1_dirty_mark(sector);
@@ -127,7 +128,7 @@ void ps1_dirty_task(void) {
     uint64_t end = time_us_64();
 
     if (hit)
-        printf("remain to flush - %d - this one flushed %d and took %d ms\n", num_after, hit, (int)((end - start) / 1000));
+        QPRINTF("remain to flush - %d - this one flushed %d and took %d ms\n", num_after, hit, (int)((end - start) / 1000));
 
     if (num_after || !ps1_dirty_lockout_expired())
         ps1_dirty_activity = 1;

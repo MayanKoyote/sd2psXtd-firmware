@@ -309,7 +309,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mc_auth_dumm
 
 inline __attribute__((always_inline)) void __time_critical_func(ps2_mc_auth_dummyA)(void) {
     uint8_t _ = 0U;
-    /* dummy A */
+    /* This is where real memory cards error out if the console is using different magicgate keys. eg: COH-H10020 plugged to a retail console */
     mc_respond(0x2B);
     receiveOrNextCmd(&_);
     mc_respond(term);
@@ -573,7 +573,7 @@ inline __attribute__((always_inline)) void __time_critical_func(ps2_mc_auth_keyS
     receiveOrNextCmd(&_);
     DPRINTF("KeySelect: requested %d key\n", _);
     if (PS2_VARIANT_RETAIL == settings_get_ps2_variant()) {
-        switch (_) {
+        switch (_ & 0x03) {
             case REQUEST_DEX:
                 keysource = ps2_keysource;
                 key = dex_key;

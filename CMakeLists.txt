@@ -91,7 +91,8 @@ add_library(sd2psx_common STATIC
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/keystore.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/settings.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/bigmem.c
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/card_config.c)
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/card_config.c
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/serial_input.c)
 
 target_include_directories(sd2psx_common
                 PUBLIC
@@ -131,7 +132,8 @@ if (SD2PSX_WITH_GUI)
                 PUBLIC
                     lvgl::lvgl
                 PRIVATE
-                    ssd1306)
+                    ssd1306
+                    sd2psx_version)
 endif()
 
 if (SD2PSX_WITH_LED)
@@ -158,5 +160,6 @@ if(DEBUG_USB_UART)
     target_compile_definitions(sd2psx_common PUBLIC -DDEBUG_USB_UART -DMMCE_DEBUG -DPICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=${DEBUG_STARTUP_DELAY}*1000)
     pico_enable_stdio_usb(${TARGET_NAME} 1)
 else()
-    pico_enable_stdio_usb(${TARGET_NAME} 0)
+    target_compile_definitions(sd2psx_common PUBLIC -DPICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=0)
+    pico_enable_stdio_usb(${TARGET_NAME} 1)
 endif()

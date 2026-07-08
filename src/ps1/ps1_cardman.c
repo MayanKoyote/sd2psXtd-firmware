@@ -59,6 +59,9 @@ static void set_default_card() {
     card_chan = settings_get_ps1_channel();
     cardman_state = PS1_CM_STATE_NORMAL;
     snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
+    uint8_t max_chan = card_config_get_max_channels(folder_name, folder_name);
+    if (card_chan > max_chan)
+        card_chan = max_chan;
 }
 
 static bool try_set_game_id_card() {
@@ -75,9 +78,12 @@ static bool try_set_game_id_card() {
     card_idx = PS1_CARD_IDX_SPECIAL;
     card_chan = CHAN_MIN;
     cardman_state = PS1_CM_STATE_GAMEID;
+    memset(folder_name, 0, sizeof(folder_name));
     card_config_get_card_folder(parent_id, folder_name, sizeof(folder_name));
 
-    snprintf(folder_name, sizeof(folder_name), "%s", parent_id);
+    if (!folder_name[0])
+        snprintf(folder_name, sizeof(folder_name), "%s", parent_id);
+
 
     return true;
 }
@@ -173,7 +179,6 @@ static void genblock(size_t pos, void *buf) {
 
 void ps1_cardman_open(void) {
     char path[96];
-    sd_init();
     ensuredirs();
     needs_update = false;
 
@@ -288,7 +293,11 @@ void ps1_cardman_next_channel(void) {
         case PS1_CM_STATE_NORMAL:
             card_chan += 1;
             if (card_chan > max_chan)
+#if WITH_GUI
                 card_chan = CHAN_MIN;
+#else
+                card_chan = max_chan; //dont jump to CHAN_MIN. Otherwise without display, you cant see where you actually are.
+#endif
             break;
     }
 
@@ -305,7 +314,11 @@ void ps1_cardman_prev_channel(void) {
         case PS1_CM_STATE_NORMAL:
             card_chan -= 1;
             if (card_chan < CHAN_MIN)
+#if WITH_GUI
                 card_chan = max_chan;
+#else
+                card_chan = CHAN_MIN; //dont jump to max_chan. Otherwise without display, you cant see where you actually are.
+#endif
             break;
     }
     needs_update = true;
@@ -329,6 +342,12 @@ void ps1_cardman_next_idx(void) {
             card_chan = CHAN_MIN;
             if (card_idx > UINT16_MAX)
                 card_idx = UINT16_MAX;
+            uint8_t maxcards = settings_get_ps1_maxcardidx();
+            if (maxcards != 0) //0 = unlimited cards UINT16_MAX
+            {
+                if (card_idx > maxcards)
+                    card_idx = maxcards;
+            }
             snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
             break;
     }
@@ -396,6 +415,29 @@ void ps1_cardman_switch_bootcard(void) {
 void ps1_cardman_switch_default(void) {
     if (PS1_CARD_IDX_SPECIAL == card_idx) {
         set_default_card();
+        needs_update = true;
+    }
+}
+
+void ps1_cardman_set_idx(int idx) {
+    if (idx < PS1_CARD_IDX_SPECIAL)
+        idx = PS1_CARD_IDX_SPECIAL;
+
+    if (idx != card_idx) {
+        card_idx = idx;
+        card_chan = CHAN_MIN;
+        cardman_state = PS1_CM_STATE_NORMAL;
+        snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
+        needs_update = true;
+    }
+}
+
+void ps1_cardman_set_channel(int chn) {
+    if (chn < CHAN_MIN)
+        chn = CHAN_MIN;
+
+    if (chn != card_chan) {
+        card_chan = chn;
         needs_update = true;
     }
 }

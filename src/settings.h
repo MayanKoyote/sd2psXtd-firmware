@@ -12,6 +12,10 @@ int settings_get_ps1_boot_channel(void);
 void settings_set_ps1_card(int x);
 void settings_set_ps1_channel(int x);
 void settings_set_ps1_boot_channel(int x);
+bool settings_get_ps1_controllercombo(void);
+void settings_set_ps1_controllercombo(bool controllercombo);
+uint8_t settings_get_ps1_maxcardidx(void);
+void settings_set_ps1_maxcardidx(uint8_t x);
 
 int settings_get_ps2_card(void);
 int settings_get_ps2_channel(void);
@@ -23,6 +27,8 @@ void settings_set_ps2_channel(int x);
 void settings_set_ps2_boot_channel(int x);
 void settings_set_ps2_cardsize(uint8_t size);
 void settings_set_ps2_variant(int x);
+uint8_t settings_get_ps2_maxcardidx(void);
+void settings_set_ps2_maxcardidx(uint8_t x);
 
 enum {
     MODE_PS1 = 0,

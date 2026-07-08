@@ -7,6 +7,7 @@
 #include "ps1_mc_data_interface.h"
 #include "ps1_mmce.h"
 #include "string.h"
+#include <settings.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -117,12 +118,12 @@ static uint8_t __time_critical_func(recv_cmd)(uint8_t* cmd, uint32_t sm) {
 
 #define receiveOrNextCmd(cmd)          \
     if ((recv_cmd(cmd, cmd_reader.sm) == RECEIVE_RESET) || !card_active) \
-    {DPRINTF("!R: %s:%u\n", __func__, __LINE__); \
+    { \
     return;}
 
 #define receiveOrNextCntrl(cmd)          \
     if ((recv_cmd(cmd, cntrl_reader.sm) == RECEIVE_RESET) || !card_active) \
-    {DPRINTF("!RC %s:%u\n", __func__, __LINE__); \
+    { \
     return;}
 
 static void __time_critical_func(ps1_mc_respond)(uint8_t ch) {
@@ -281,6 +282,7 @@ static void __time_critical_func(mc_mmce_set_game_id)(void) {
         respondOrNextCmd(prev);   receiveOrNextCmd(&game_id[i]);
         prev = game_id[i];
     }
+    game_id[length == UINT8_MAX ? UINT8_MAX - 1 : length] = 0x00;
 
     ps1_mmce_set_gameid(game_id);
 }
@@ -321,6 +323,15 @@ static void __time_critical_func(mc_mmce_next_index)(void) {
     ps1_mmce_next_idx(false);
 }
 
+static void __time_critical_func(mc_mmce_reset)(void) {
+    uint8_t _;
+    respondOrNextCmd(0x00);   receiveOrNextCmd(&_);
+    respondOrNextCmd(0x00);   receiveOrNextCmd(&_);
+    respondOrNextCmd(0x20);   receiveOrNextCmd(&_);
+    respondOrNextCmd(0xFF);   receiveOrNextCmd(&_);
+    ps1_mmce_reset(false);
+}
+
 /**
   01h  Hi-Z  Controller address
   42h  idlo  Receive ID bit0..7 (variable) and Send Read Command (ASCII "B")
@@ -353,6 +364,7 @@ static void mc_read_controller(void) {
     static uint8_t prevCommand = 0;
     uint8_t controller_in[2];
     uint8_t _ = 0x00;
+
     receiveOrNextCmd(&_);
     if (_ == (uint8_t)'B') {    // Only reactive to "read buttons" command
         receiveOrNextCntrl(&_); // Hi-Z
@@ -376,32 +388,32 @@ static void mc_read_controller(void) {
         if (IS_PRESSED(controller_in[1], HOTKEYS)) {
             if (prevCommand == 0) {
                 if (IS_PRESSED(controller_in[0], BTN_UP)) {
-                    prevCommand = MCP_NXT_CARD;
+                    prevCommand = MMCE_PS1_NXT_CARD;
                 } else if (IS_PRESSED(controller_in[0], BTN_DWN)) {
-                    prevCommand = MCP_PRV_CARD;
+                    prevCommand = MMCE_PS1_PRV_CARD;
                 } else if (IS_PRESSED(controller_in[0], BTN_LFT)) {
-                    prevCommand = MCP_PRV_CH;
+                    prevCommand = MMCE_PS1_PRV_CH;
                 } else if (IS_PRESSED(controller_in[0], BTN_RGT)) {
-                    prevCommand = MCP_NXT_CH;
+                    prevCommand = MMCE_PS1_NXT_CH;
                 } else if (IS_PRESSED(controller_in[0], BTN_SEL)) {
-                    prevCommand = MCP_SWITCH_BOOTCARD;
+                    prevCommand = MMCE_PS1_SWITCH_BOOTCARD;
                 }
             }
         } else if (prevCommand != 0){
             switch (prevCommand) {
-                case MCP_NXT_CARD:
+                case MMCE_PS1_NXT_CARD:
                     ps1_mmce_next_idx(false);
                     break;
-                case MCP_PRV_CARD:
+                case MMCE_PS1_PRV_CARD:
                     ps1_mmce_prev_idx(false);
                     break;
-                case MCP_NXT_CH:
+                case MMCE_PS1_NXT_CH:
                     ps1_mmce_next_ch(false);
                     break;
-                case MCP_PRV_CH:
+                case MMCE_PS1_PRV_CH:
                     ps1_mmce_prev_ch(false);
                     break;
-                case MCP_SWITCH_BOOTCARD:
+                case MMCE_PS1_SWITCH_BOOTCARD:
                     ps1_mmce_switch_bootcard(false);
                     break;
             }
@@ -450,13 +462,14 @@ static void __time_critical_func(mc_main_loop)(void) {
                 case 0x23: mc_mmce_next_channel(); break;
                 case 0x24: mc_mmce_prev_index(); break;
                 case 0x25: mc_mmce_next_index(); break;
+                case 0x27: mc_mmce_reset(); break;
                 case 'B': mc_cmd_read(true); break;
                 case 'R': mc_cmd_read(false); break;
                 case 'S': mc_cmd_get_card_id(); break;
                 case 'W': mc_cmd_write(); break;
                 default: DPRINTF("Unknown command: 0x%.02x\n", ch); break;
             }
-        } else if (0x01 == ch) {
+        } else if ((0x01 == ch) && (settings_get_ps1_controllercombo())) {
             mc_read_controller();
         } else if ((0x21 == ch) && !ps2_multitap) {
             ps1_mc_respond(0x00);

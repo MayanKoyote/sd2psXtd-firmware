@@ -38,13 +38,40 @@ extern "C" void sd_init() {
 
 
         int ret = sd.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_BAUD, &SD_PERIPH));
+/*
+        cid_t cid;
+        if (sd.card()->readCID(&cid)) {
+            DPRINTF("SD Card CID:\n");
+            DPRINTF(" Manufacturer ID: 0x%02X\n", cid.mid);
+            DPRINTF(" OEM ID: %.2s\n", cid.oid);
+            DPRINTF(" Product: %.5s\n", cid.pnm);
+            DPRINTF(" Revision: %d.%d\n", cid.prv_n, cid.prv_m);
+            DPRINTF(" Serial number: 0x%08X\n", cid.psn);
+            DPRINTF(" Manufacturing date: %02d/%04d\n",
+                cid.mdt_month, 2000 + ((cid.mdt_year_high << 4) | cid.mdt_year_low));
+        } else {
+            DPRINTF("failed to read CID\n");
+        }*/
         if (ret != 1) {
+            char text[128];
+            cid_t cid;
+            memset(&cid, 0, sizeof(cid));
+            sd.card()->readCID(&cid);
+            snprintf(text, sizeof(text),
+                "MID: 0x%02X    OEM-ID: %.2s\nPID: %.5s    R: %d.%d\nSN: 0x%08X  Date: %02d/%04d",
+                cid.mid,
+                cid.oid,
+                cid.pnm,
+                cid.prv_n, cid.prv_m,
+                cid.psn,
+                cid.mdt_month, 2000 + ((cid.mdt_year_high << 4) | cid.mdt_year_low));
+
             if (sd.sdErrorCode()) {
-                fatal(ERR_SDCARD, "failed to mount the card\nSdError: 0x%02X,0x%02X\ncheck the card", sd.sdErrorCode(), sd.sdErrorData());
+                fatal(ERR_SDCARD, "failed to mount the card\nSdError: 0x%02X,0x%02X\ncheck the card\n%s", sd.sdErrorCode(), sd.sdErrorData(), text);
             } else if (!sd.fatType()) {
                 fatal(ERR_SDCARD, "failed to mount the card\ncheck the card is formatted correctly");
             } else {
-                fatal(ERR_SDCARD, "failed to mount the card\nUNKNOWN");
+                fatal(ERR_SDCARD, "failed to mount the card\nUNKNOWN\n%s", text);
             }
         }
         initialized = true;
@@ -108,8 +135,13 @@ extern "C" int sd_read(int fd, void *buf, size_t count) {
 
 extern "C" int sd_write(int fd, void *buf, size_t count) {
     CHECK_FD(fd);
+    int retry = 5;
+    size_t ret = files[fd].write(buf, count);
+    while (ret != count && retry-- > 0) {
+        ret = files[fd].write(buf, count);
+    }
 
-    return files[fd].write(buf, count);
+    return ret;
 }
 
 extern "C" int sd_seek(int fd, int32_t offset, int whence) {
@@ -154,6 +186,11 @@ extern "C" int sd_filesize(int fd) {
 extern "C" int sd_rmdir(const char* path) {
     /* return 1 on error */
     return sd.rmdir(path) != true;
+}
+
+extern "C" int sd_rename(const char* old_path, const char* new_path) {
+    /* return 1 on error */
+    return !sd.rename(old_path, new_path) ? -1 : 0;
 }
 
 extern "C" int sd_remove(const char* path) {
@@ -271,4 +308,24 @@ extern "C" int sd_seek64(int fd, int64_t offset, int whence) {
         return files[fd].seekEnd(offset) != true;
     }
     return 1;
+}
+
+extern "C" sd_cid_t sd_get_CID(void) {
+    cid_t cid;
+    sd_cid_t out_cid;
+
+    if (sd.card()->readCID(&cid)) {
+        out_cid.psn = cid.psn;
+        out_cid.mid = cid.mid;
+        memcpy(out_cid.oid, cid.oid, 2);
+        memcpy(out_cid.pnm, cid.pnm, 5);
+        out_cid.prv = (cid.prv_n << 4) | cid.prv_m;
+        out_cid.mdt_month = cid.mdt_month;
+        out_cid.mdt_year_high = cid.mdt_year_high;
+        out_cid.mdt_year_low = cid.mdt_year_low;
+        out_cid.always1 = cid.always1;
+    } else {
+        memset(&out_cid, 0, sizeof(sd_cid_t));
+    }
+    return out_cid;
 }

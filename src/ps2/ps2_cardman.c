@@ -53,7 +53,10 @@ int current_read_sector = 0, priority_sector = -1;
 
 #define MAX_GAME_NAME_LENGTH (127)
 #define MAX_PREFIX_LENGTH    (4)
+#define MAX_PATH_LENGTH      (256)
+
 #define MAX_SLICE_LENGTH     (30 * 1000)
+
 
 static int card_variant;
 static int card_idx;
@@ -87,6 +90,9 @@ static void set_default_card() {
     card_chan = settings_get_ps2_channel();
     cardman_state = PS2_CM_STATE_NORMAL;
     snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
+    uint8_t max_chan = card_config_get_max_channels(folder_name, folder_name);
+    if (card_chan > max_chan)
+        card_chan = max_chan;
 }
 
 static bool try_set_game_id_card() {
@@ -220,21 +226,80 @@ static void ensuredirs(void) {
     if (!sd_exists("MemoryCards") || !sd_exists(cardhome) || !sd_exists(cardpath))
         fatal(ERR_CARDMAN, "error creating directories");
 }
+
+
+static void wr32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
+}
+
+static void wr16(uint8_t *p, uint16_t v) {
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+}
+
+
+#define CARD_CLUSTER_SIZE       (1024)
+#define CARD_CLUSTERS_PER_BLOCK (8)
+#define CARD_RESERVED_CLUSTERS  (16)
+
 #define CARD_OFFS_SUPERBLOCK (0)
 #define CARD_OFFS_IND_FAT_0  (0x4000)
 #define CARD_OFFS_IND_FAT_1  (0x4200)
 #define CARD_OFFS_IND_FAT_2  (0x4400)
 #define CARD_OFFS_IND_FAT_3  (0x4600)
+#define CARD_OFFS_IND_FAT(X) (0x4000 + (X) * 0x400)
 #define CARD_OFFS_FAT_NORMAL (0x4400)
+#define CARD_OFFS_FAT(X)     (CARD_OFFS_IND_FAT(X))
 #define CARD_OFFS_FAT_BIG    (0x4800)
 
-uint8_t block0[0xD0] = {
-    0x53, 0x6F, 0x6E, 0x79, 0x20, 0x50, 0x53, 0x32, 0x20, 0x4D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x20, 0x43, 0x61, 0x72, 0x64, 0x20, 0x46, 0x6F, 0x72, 0x6D, 0x61,
-    0x74, 0x20, 0x31, 0x2E, 0x32, 0x2E, 0x30, 0x2E, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02, 0x00, 0x10, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x01, 0x00,
-    0x11, 0x01, 0x00, 0x00, 0xDF, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x1F, 0x00, 0x00, 0xFE, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
+#define CARD_SIZE_MB         (card_size / (1024 * 1024))
+#define CARD_CLUST_CNT       (card_size / CARD_CLUSTER_SIZE)
+#define CARD_FAT_LENGTH_PAD  (CARD_CLUST_CNT * 4)
+#define CARD_IND_FAT_SIZE    (CARD_SIZE_MB * 16)
+#define CARD_FAT_LENGTH      ((CARD_CLUST_CNT * 4 + 1023) / 1024)
+#define CARD_IFC_LENGTH      ((CARD_FAT_LENGTH * 4 + 1023) / 1024)
+#define CARD_ALLOC_START     (CARD_RESERVED_CLUSTERS + CARD_IFC_LENGTH + CARD_FAT_LENGTH)
+#define CARD_BACKUP_BLOCK1   ((CARD_CLUST_CNT / CARD_CLUSTERS_PER_BLOCK) - 1)
+#define CARD_BACKUP_BLOCK2   (CARD_BACKUP_BLOCK1 - 1)
+#define CARD_ALLOC_END       ((CARD_BACKUP_BLOCK2 * CARD_CLUSTERS_PER_BLOCK) - CARD_ALLOC_START)
+
+static void build_superblock(uint8_t *buf) {
+    static const char magic[] = "Sony PS2 Memory Card Format ";
+    static const char version[12] = "1.2.0.0";
+
+    memset(buf, 0xFF, PS2_PAGE_SIZE);
+    memset(buf, 0x00, 0xD0);
+
+    memcpy(&buf[0x000], magic, sizeof(magic) - 1);
+    memcpy(&buf[0x01C], version, sizeof(version));
+    wr16(&buf[0x028], PS2_PAGE_SIZE);                 // Page size
+    wr16(&buf[0x02A], 2);                             // Pages per cluster
+    wr16(&buf[0x02C], 16);                            // Pages per erase block
+    wr16(&buf[0x02E], 0xFF00);                        // Unused
+    wr32(&buf[0x030], (uint32_t)CARD_CLUST_CNT);      // Total clusters
+    wr32(&buf[0x034], (uint32_t)CARD_ALLOC_START);    // Alloc offset
+    wr32(&buf[0x038], (uint32_t)CARD_ALLOC_END);      // Alloc end
+    wr32(&buf[0x03C], 0);                             // Root dir cluster
+    wr32(&buf[0x040], (uint32_t)CARD_BACKUP_BLOCK1);  // Backup block 1
+    wr32(&buf[0x044], (uint32_t)CARD_BACKUP_BLOCK2);  // Backup block 2
+
+    for (int i = 0; i < CARD_IFC_LENGTH; i++) {
+        wr32(&buf[0x050 + i * 4], (uint32_t)(CARD_RESERVED_CLUSTERS + i));
+    }
+
+    memset(&buf[0x150], 0x00, 0x2C);
+    buf[0x150] = 0x02;                                // Card type
+    buf[0x151] = 0x2B;                                // Card features
+    wr32(&buf[0x154], CARD_CLUSTER_SIZE);             // Cluster size
+    wr32(&buf[0x158], 256);                           // FAT entries per cluster
+    wr32(&buf[0x15C], CARD_CLUSTERS_PER_BLOCK);       // Clusters per block
+    wr32(&buf[0x160], 0xFFFFFFFFu);                   // Card form
+    // Note: for whatever weird reason, the max alloc cluster cnt needs to be calculated this way.
+    wr32(&buf[0x170], (uint32_t)(((CARD_CLUST_CNT / 1000) * 1000) + 1));
+}
 
 uint8_t blockRoot[1024] = {
     0x27, 0x84, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x29, 0x00, 0x06, 0x0C, 0x01, 0xD0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x29,
@@ -283,101 +348,54 @@ static void genblock(size_t pos, void *vbuf) {
 
     uint8_t ind_cnt = 1;
 
-#define CARD_SIZE_MB         (card_size / (1024 * 1024))
-#define CARD_CLUST_CNT       (card_size / 1024)
-#define CARD_FAT_LENGTH_PAD  (CARD_CLUST_CNT * 4)
-#define CARD_SUPERBLOCK_SIZE (16)
-#define CARD_IND_FAT_SIZE    (CARD_SIZE_MB * 16)
-#define CARD_IFC_SIZE        (CARD_SIZE_MB > 64 ? 2 : 1)
-#define CARD_ALLOC_START     ((CARD_FAT_LENGTH_PAD / 1024) + CARD_IFC_SIZE + 16)
-#define CARD_ALLOC_CLUSTERS  (CARD_CLUST_CNT - ((CARD_ALLOC_START - 1) + 16))
-#define CARD_FAT_LENGTH      (CARD_ALLOC_CLUSTERS * 4)
+#define CURR_BLOCK           (pos / PS2_PAGE_SIZE)
 
-    // printf("CARD_SIZE_MB: %.08x\n", CARD_SIZE_MB);
-    // printf("CARD_CLUST_CNT: %.08x\n", CARD_CLUST_CNT);
-    // printf("CARD_FAT_LENGTH_PAD: %.08x\n", CARD_FAT_LENGTH_PAD);
-    // printf("CARD_SUPERBLOCK_SIZE: %.08x\n", CARD_SUPERBLOCK_SIZE);
-    // printf("CARD_IND_FAT_SIZE: %.08x\n", CARD_IND_FAT_SIZE);
-    // printf("CARD_IFC_SIZE: %.08x\n", CARD_IFC_SIZE);
-    // printf("CARD_ALLOC_START: %.08x\n", CARD_ALLOC_START);
-    // printf("CARD_ALLOC_CLUSTERS: %.08x\n", CARD_ALLOC_CLUSTERS);
-    // printf("CARD_FAT_LENGTH: %.08x\n", CARD_FAT_LENGTH);
-
-    switch (CARD_SIZE_MB) {
-        case 1:
-        case 2:
-        case 4:
-        case 8:
-        case 16:
-        case 32: ind_cnt = 1; break;
-        case 64: ind_cnt = 2; break;
-        case 128: ind_cnt = 4; break;
-    }
+    ind_cnt = CARD_IFC_LENGTH;
 
     memset(buf, 0xFF, PS2_PAGE_SIZE);
 
+    //printf("pos: %zu, CURR_BLOCK: %d, ind_cnt: %d\n", pos, CURR_BLOCK, ind_cnt);
+
     if (pos == CARD_OFFS_SUPERBLOCK) {  // Superblock
-        // 0x30: Clusters Total (2 Bytes): card_size / 1024
-        // 0x34: Alloc start: 0x49
-        // 0x38: Alloc end: ((((card_size / 8) / 1024) - 2) * 8) - 41
-        // 0x40: BBlock 1 - ((card_size / 8) / 1024) - 1
-        // 0x44: BBlock 2 - ((card_size / 8) / 1024) - 2
-        memset(buf, 0x00, 0xD0);
-        memcpy(buf, block0, sizeof(block0));
-        memset(&buf[0x150], 0x00, 0x2C);
-        (*(uint32_t *)&buf[0x30]) = (uint32_t)(CARD_CLUST_CNT);                // Total clusters
-        (*(uint32_t *)&buf[0x34]) = CARD_ALLOC_START;                          // Alloc Start
-        (*(uint32_t *)&buf[0x38]) = (uint32_t)(CARD_ALLOC_CLUSTERS - 1);       // Alloc End
-        (*(uint32_t *)&buf[0x40]) = (uint32_t)(((card_size / 8) / 1024) - 1);  // BB1
-        (*(uint32_t *)&buf[0x44]) = (uint32_t)(((card_size / 8) / 1024) - 2);  // BB2
-        buf[0x150] = 0x02;                                                     // Card Type
-        buf[0x151] = 0x2B;                                                     // Card Features
-        buf[0x152] = 0x00;                                                     // Card Features
-        (*(uint32_t *)&buf[0x154]) = (uint32_t)(2 * PS2_PAGE_SIZE);            // ClusterSize
-        (*(uint32_t *)&buf[0x158]) = (uint32_t)(256);                          // FAT Entries per Cluster
-        (*(uint32_t *)&buf[0x15C]) = (uint32_t)(8);                            // Clusters per Block
-        (*(uint32_t *)&buf[0x160]) = (uint32_t)(0xFFFFFFFF);                   // CardForm
-        // Note: for whatever weird reason, the max alloc cluster cnt needs to be calculated this way.
-        (*(uint32_t *)&buf[0x170]) = (uint32_t)(((CARD_CLUST_CNT/1000) * 1000) + 1); // Max Alloc Cluster
+        build_superblock(buf);
 
 
-    } else if (pos == CARD_OFFS_IND_FAT_0) {
-        // Indirect FAT
-        uint8_t byte = 0x11;
-        int32_t count = CARD_IND_FAT_SIZE % PS2_PAGE_SIZE;
-        if (count == 0)
-            count = PS2_PAGE_SIZE;
-        for (int i = 0; i < count; i++) {
-            if (i % 4 == 0) {
-                buf[i] = byte++;
-            } else {
-                buf[i] = 0;
+    } else if ((pos >= CARD_OFFS_IND_FAT_0) && (pos < (size_t)CARD_OFFS_IND_FAT(ind_cnt))) {
+
+        // Indirect FAT: IFC entry j stores absolute cluster of FAT cluster j,
+        // which is (reserved_clusters + ifc_length + j). Each IFC page holds 128 entries.
+        uint32_t page_in_ifc = (uint32_t)((pos - CARD_OFFS_IND_FAT_0) / PS2_PAGE_SIZE);
+        uint32_t base_j       = page_in_ifc * 128;
+        uint32_t first_fat_cl = (uint32_t)(CARD_RESERVED_CLUSTERS + ind_cnt);
+        int32_t  n            = (int32_t)CARD_FAT_LENGTH - (int32_t)base_j;
+        if (n > 128) n = 128;
+        if (n < 0)   n = 0;
+        for (int k = 0; k < n; k++) {
+            wr32(&buf[k * 4], first_fat_cl + base_j + (uint32_t)k);
+        }
+    } else if (pos >= (size_t)CARD_OFFS_FAT(ind_cnt) &&
+               pos <  (size_t)CARD_OFFS_FAT(ind_cnt) + (size_t)CARD_FAT_LENGTH * 1024) {
+        // FAT region: pages of 128 uint32 entries each, indexed by relative cluster.
+        //   rel == 0                    -> 0xFFFFFFFF  (root dir end-of-chain)
+        //   1 <= rel < alloc_end        -> 0x7FFFFFFF  (free)
+        //   rel >= alloc_end            -> leave 0xFFFFFFFF (reserved/out-of-range)
+        const uint32_t free_val = 0x7FFFFFFFu;
+        const uint32_t end_val  = 0xFFFFFFFFu;
+        uint32_t page_in_fat = (uint32_t)((pos - (size_t)CARD_OFFS_FAT(ind_cnt)) / PS2_PAGE_SIZE);
+        uint32_t base_entry  = page_in_fat * 128;
+        for (uint32_t k = 0; k < 128; k++) {
+            uint32_t rel = base_entry + k;
+            if (rel == 0) {
+                wr32(&buf[k * 4], end_val);
+            } else if (rel < (uint32_t)CARD_ALLOC_END) {
+                wr32(&buf[k * 4], free_val);
             }
-        }
-    } else if ((pos == CARD_OFFS_IND_FAT_1) && (ind_cnt >= 2)) {
-        uint32_t entry = 0x91;
-        for (int i = 0; i < PS2_PAGE_SIZE; i += 4) {
-            *(uint32_t *)(&buf[i]) = entry;
-            entry++;
-        }
-    } else if (pos >= CARD_OFFS_FAT_NORMAL && pos < CARD_OFFS_FAT_NORMAL + CARD_FAT_LENGTH) {
-        const uint32_t val = 0x7FFFFFFF;
-        size_t i = 0;
-        // FAT Table
-        if (pos == CARD_OFFS_FAT_NORMAL) {  // First cluster is used for root dir
-            i = 4;
-        }
-        for (; i < PS2_PAGE_SIZE; i += 4) {
-            if (pos + i < (CARD_OFFS_FAT_NORMAL + CARD_FAT_LENGTH) - 4) {  // -4 because last fat entry is FFFFFFFF
-                memcpy(&buf[i], &val, sizeof(val));
-            } else {
-                break;
-            }
+            // else: leave memset 0xFFFFFFFF
         }
 
-    } else if (pos == (CARD_ALLOC_START * 1024)) {
+    } else if (pos == (CARD_ALLOC_START * CARD_CLUSTER_SIZE)) {
         memcpy(buf, blockRoot, PS2_PAGE_SIZE);
-    } else if (pos == (CARD_ALLOC_START * 1024) + PS2_PAGE_SIZE) {
+    } else if (pos == (CARD_ALLOC_START * CARD_CLUSTER_SIZE) + PS2_PAGE_SIZE) {
         memcpy(buf, &blockRoot[PS2_PAGE_SIZE], PS2_PAGE_SIZE);
     }
 }
@@ -507,88 +525,133 @@ static void ps2_cardman_continue(void) {
     }
 }
 
-void ps2_cardman_open(void) {
-    char path[256];
+static bool ps2_check_cardsize(uint32_t filesize) {
+    switch (filesize) {
+        case PS2_CARD_SIZE_512K:
+        case PS2_CARD_SIZE_1M:
+        case PS2_CARD_SIZE_2M:
+        case PS2_CARD_SIZE_4M:
+        case PS2_CARD_SIZE_8M:
+        case PS2_CARD_SIZE_16M:
+        case PS2_CARD_SIZE_32M:
+        case PS2_CARD_SIZE_64M:
+        case PS2_CARD_SIZE_128M:
+        case PS2_CARD_SIZE_256M:
+        case PS2_CARD_SIZE_512M:
+        case PS2_CARD_SIZE_1G:
+        case PS2_CARD_SIZE_2G: return true;
+        default: return false;
+    }
+}
 
-    needs_update = false;
+#if WITH_PSRAM
+static void ps2_cardman_initializePSRAMCard(void) {
+        // quickly generate and write an empty card into PSRAM so that it's immediately available, takes about ~0.6s
+    for (size_t pos = 0; pos < card_size; pos += BLOCK_SIZE) {
+        if (card_size == PS2_CARD_SIZE_8M)
+            genblock(pos, flushbuf);
+        else
+            memset(flushbuf, 0xFF, BLOCK_SIZE);
 
-    sd_init();
-    ensuredirs();
+        ps2_dirty_lock();
+        psram_write_dma(pos, flushbuf, BLOCK_SIZE, NULL);
+        psram_wait_for_dma();
+        ps2_cardman_mark_sector_available(pos / BLOCK_SIZE);
+        ps2_dirty_unlock();
+    }
+    log(LOG_TRACE, "%s created empty PSRAM image... \n", __func__);
+}
+#endif
 
+static void ps2_cardman_createCard(char* path) {
+    card_size = card_config_get_ps2_cardsize(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name) * 1024 * 1024;
+    if (card_size == 0U) {
+        card_size = settings_get_ps2_cardsize() * 1024 * 1024;
+    }
+    cardman_fd = sd_open(path, O_RDWR | O_CREAT | O_TRUNC);
+    cardman_sectors_done = 0;
+    cardprog_pos = 0;
+    if (card_size > PS2_CARD_SIZE_8M) {
+        ps2_mc_data_interface_set_sdmode(true);
+    } else {
+        ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE);
+    }
+
+    if (cardman_fd < 0)
+        fatal(ERR_CARDMAN, "cannot open for creating new card");
+
+    log(LOG_INFO, "create new image at %s... ", path);
+
+    if (cardman_cb)
+        cardman_cb(0, false);
+#if WITH_PSRAM
+    if (card_size <= PS2_CARD_SIZE_8M) {
+        ps2_cardman_initializePSRAMCard();
+    }
+#endif
+}
+
+static void ps2_cardman_resolveCardPath(char* path) {
     switch (cardman_state) {
         case PS2_CM_STATE_BOOT:
             if (card_chan == 1) {
-                snprintf(path, sizeof(path), "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
+                snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
                 if (!sd_exists(path)) {
                     // before boot card channels, boot card was located at BOOT/BootCard.mcd, for backwards compatibility check if it exists
-                    snprintf(path, sizeof(path), "%s/%s/BootCard.mcd", cardhome, folder_name);
+                    snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard.mcd", cardhome, folder_name);
                 }
                 if (!sd_exists(path)) {
                     // go back to BootCard-1.mcd if it doesn't
-                    snprintf(path, sizeof(path), "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
+                    snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
                 }
             } else {
-                snprintf(path, sizeof(path), "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
+                snprintf(path, MAX_PATH_LENGTH, "%s/%s/BootCard-%d.mcd", cardhome, folder_name, card_chan);
             }
 
             settings_set_ps2_boot_channel(card_chan);
             break;
         case PS2_CM_STATE_NAMED:
-        case PS2_CM_STATE_GAMEID: snprintf(path, sizeof(path), "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan); break;
+        case PS2_CM_STATE_GAMEID: snprintf(path, MAX_PATH_LENGTH, "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan); break;
         case PS2_CM_STATE_NORMAL:
-            snprintf(path, sizeof(path), "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan);
+            snprintf(path, MAX_PATH_LENGTH, "%s/%s/%s-%d.mcd", cardhome, folder_name, folder_name, card_chan);
 
             /* this is ok to do on every boot because it wouldn't update if the value is the same as currently stored */
             settings_set_ps2_card(card_idx);
             settings_set_ps2_channel(card_chan);
             break;
     }
+}
+
+static void ps2_cardman_move_card_crp(char* path) {
+    char crp_path[MAX_PATH_LENGTH] = {};
+    for (int i = 0; i < 512; i++) {
+        snprintf(crp_path, sizeof(crp_path), "%s/%s/%s-%d.crp.%i", cardhome, folder_name, folder_name, card_chan, i);
+        if (!sd_exists(crp_path))
+            break;
+    }
+    if (!crp_path[0])
+        fatal(ERR_CARDMAN, "Card %d Chann %d invalid size and cannot create .crp file", card_idx, card_chan);
+    sd_close(cardman_fd);
+    sd_rename(path, crp_path);
+    log(LOG_ERROR, "Card %d Chann %d has invalid size and was renamed to %s\n", card_idx, card_chan, crp_path);
+}
+
+void ps2_cardman_open(void) {
+    char path[MAX_PATH_LENGTH];
+
+    needs_update = false;
+
+    ensuredirs();
+
+    ps2_cardman_resolveCardPath(path);
 
     log(LOG_INFO, "Switching to card path = %s\n", path);
+
     ps2_mc_data_interface_card_changed();
 
     if (!sd_exists(path)) {
-        card_size = card_config_get_ps2_cardsize(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name) * 1024 * 1024;
-        if (card_size == 0U) {
-            card_size = settings_get_ps2_cardsize() * 1024 * 1024;
-        }
         cardman_operation = CARDMAN_CREATE;
-        cardman_fd = sd_open(path, O_RDWR | O_CREAT | O_TRUNC);
-        cardman_sectors_done = 0;
-        cardprog_pos = 0;
-        if (card_size > PS2_CARD_SIZE_8M) {
-            ps2_mc_data_interface_set_sdmode(true);
-        } else {
-            ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE);
-        }
-
-        if (cardman_fd < 0)
-            fatal(ERR_CARDMAN, "cannot open for creating new card");
-
-        log(LOG_INFO, "create new image at %s... ", path);
-
-        if (cardman_cb)
-            cardman_cb(0, false);
-#if WITH_PSRAM
-        if (card_size <= PS2_CARD_SIZE_8M) {
-            // quickly generate and write an empty card into PSRAM so that it's immediately available, takes about ~0.6s
-            for (size_t pos = 0; pos < card_size; pos += BLOCK_SIZE) {
-                if (card_size == PS2_CARD_SIZE_8M)
-                    genblock(pos, flushbuf);
-                else
-                    memset(flushbuf, 0xFF, BLOCK_SIZE);
-
-                ps2_dirty_lock();
-                psram_write_dma(pos, flushbuf, BLOCK_SIZE, NULL);
-                psram_wait_for_dma();
-                ps2_cardman_mark_sector_available(pos / BLOCK_SIZE);
-                ps2_dirty_unlock();
-            }
-            log(LOG_TRACE, "%s created empty PSRAM image... \n", __func__);
-        }
-#endif
-        cardprog_start = time_us_64();
-
+        ps2_cardman_createCard(path);
     } else {
         cardman_fd = sd_open(path, O_RDWR);
         card_size = sd_filesize(cardman_fd);
@@ -599,24 +662,25 @@ void ps2_cardman_open(void) {
         if (cardman_fd < 0)
             fatal(ERR_CARDMAN, "cannot open card");
 
-        switch (card_size) {
-            case PS2_CARD_SIZE_512K:
-            case PS2_CARD_SIZE_1M:
-            case PS2_CARD_SIZE_2M:
-            case PS2_CARD_SIZE_4M:
-            case PS2_CARD_SIZE_8M: ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE); break;
-            case PS2_CARD_SIZE_16M:
-            case PS2_CARD_SIZE_32M:
-            case PS2_CARD_SIZE_64M: ps2_mc_data_interface_set_sdmode(true); break;
-            default: fatal(ERR_CARDMAN, "Card %d Chann %d invalid size", card_idx, card_chan); break;
+        if (ps2_check_cardsize(card_size)) {
+            cardman_operation = CARDMAN_OPEN;
+            cardprog_pos = 0;
+            cardman_sectors_done = 0;
+            if (card_size > PS2_CARD_SIZE_8M) {
+                ps2_mc_data_interface_set_sdmode(true);
+            } else {
+                ps2_mc_data_interface_set_sdmode(!PSRAM_AVAILABLE);
+            }
+            log(LOG_INFO, "reading card (%lu KB).... ", (uint32_t)(card_size / 1024));
+            if (cardman_cb)
+                cardman_cb(0, false);
+        } else {
+            cardman_operation = CARDMAN_CREATE;
+            ps2_cardman_move_card_crp(path);
+            ps2_cardman_createCard(path);
         }
-
-        /* read 8 megs of card image */
-        log(LOG_INFO, "reading card (%lu KB).... ", (uint32_t)(card_size / 1024));
-        cardprog_start = time_us_64();
-        if (cardman_cb)
-            cardman_cb(0, false);
     }
+    cardprog_start = time_us_64();
 
     sector_count = card_size / BLOCK_SIZE;
 
@@ -638,19 +702,21 @@ void ps2_cardman_close(void) {
 
 void ps2_cardman_set_channel(uint16_t chan_num) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
-    if (chan_num != card_chan)
-        needs_update = true;
     if (chan_num <= max_chan && chan_num >= CHAN_MIN) {
+        needs_update |= (chan_num != card_chan);
         card_chan = chan_num;
     }
-    snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
 }
 
 void ps2_cardman_next_channel(void) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
     card_chan += 1;
     if (card_chan > max_chan)
+#if WITH_GUI
         card_chan = CHAN_MIN;
+#else
+        card_chan = max_chan; //dont jump to CHAN_MIN. Otherwise without display, you cant see where you actually are.
+#endif
     needs_update = true;
 }
 
@@ -658,7 +724,11 @@ void ps2_cardman_prev_channel(void) {
     uint8_t max_chan = card_config_get_max_channels(folder_name, (cardman_state == PS2_CM_STATE_BOOT) ? "BootCard" : folder_name);
     card_chan -= 1;
     if (card_chan < CHAN_MIN)
+#if WITH_GUI
         card_chan = max_chan;
+#else
+        card_chan = CHAN_MIN; //dont jump to max_chan. Otherwise without display, you cant see where you actually are.
+#endif
     needs_update = true;
 }
 
@@ -669,11 +739,11 @@ void ps2_cardman_switch_bootcard(void) {
 }
 
 void ps2_cardman_set_idx(uint16_t idx_num) {
-    if (idx_num != card_idx)
-        needs_update = true;
     if ((idx_num >= IDX_MIN) && (idx_num < UINT16_MAX)) {
+        needs_update |= (idx_num != card_idx);
         card_idx = idx_num;
         card_chan = CHAN_MIN;
+        cardman_state = PS2_CM_STATE_NORMAL;
     }
     snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
 }
@@ -696,6 +766,12 @@ void ps2_cardman_next_idx(void) {
             card_chan = CHAN_MIN;
             if (card_idx > UINT16_MAX)
                 card_idx = UINT16_MAX;
+            uint8_t maxcards = settings_get_ps2_maxcardidx();
+            if (maxcards != 0) //0 = unlimited cards UINT16_MAX
+            {
+                if (card_idx > maxcards)
+                    card_idx = maxcards;
+            }
             snprintf(folder_name, sizeof(folder_name), "Card%d", card_idx);
             break;
     }

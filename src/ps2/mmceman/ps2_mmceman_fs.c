@@ -308,8 +308,10 @@ void ps2_mmceman_fs_run(void)
             op_data.it_fd[op_data.fd] = sd_iterate_dir(op_data.fd, op_data.it_fd[op_data.fd]);
 
             if (op_data.it_fd[op_data.fd] != -1) {
+                size_t name_length = 0;
                 sd_get_stat(op_data.it_fd[op_data.fd], (ps2_fileio_stat_t*)&op_data.fileio_stat);
-                op_data.length = sd_get_name(op_data.it_fd[op_data.fd], (char*)&op_data.buffer[0], 128);
+                name_length = sd_get_name(op_data.it_fd[op_data.fd], (char*)&op_data.buffer[0], 128);
+                op_data.length = name_length > 0 ? name_length : 0;
 
                 op_data.length++;
                 op_data.buffer[0][op_data.length] = '\0'; //add null term

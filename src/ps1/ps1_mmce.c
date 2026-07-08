@@ -7,6 +7,7 @@
 #include "ps1_mmce.h"
 #include "debug.h"
 #include "game_db/game_db.h"
+#include "settings.h"
 
 #if WITH_GUI
 #include <gui.h>
@@ -71,6 +72,14 @@ void ps1_mmce_task(void) {
             case MMCE_PS1_SET_CHANNEL:
                 DPRINTF("Received set channel index: %d\n", mmce_chn);
                 ps1_cardman_set_channel(mmce_chn);
+                break;
+            case MMCE_PS1_RESET:
+                DPRINTF("Received reset command.\n");
+                if (settings_get_mode(false) == MODE_PS2) {
+                    settings_set_mode(MODE_PS2);
+                } else {
+                    ps1_cardman_switch_default();
+                }
                 break;
             default:
                 DPRINTF("Invalid ODE Command received.");
@@ -158,4 +167,9 @@ void ps1_mmce_set_channel(uint16_t chn, bool delay) {
     mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
     mmce_chn = chn;
     mmce_command = MMCE_PS1_SET_CHANNEL;
+}
+
+void ps1_mmce_reset(bool delay) {
+    mmce_switching_timeout = time_us_64() + (delay ? 1500 * 1000 : 0);
+    mmce_command = MMCE_PS1_RESET;
 }

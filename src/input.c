@@ -15,7 +15,7 @@
 #define HOLD_START_MS 250
 #define HOLD_END_MS 500
 
-#ifdef PMC_BUTTONS
+#if PMC_BUTTONS
     #define BTN_CNT 3
 #else
     #define BTN_CNT 2

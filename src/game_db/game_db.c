@@ -271,8 +271,10 @@ void __time_critical_func(game_db_extract_title_id)(const uint8_t* const in_titl
     uint16_t idx_in_title = 0, idx_out_title = 0;
     uint8_t prefix_count = 0;
 
-    while ( (in_title_id[idx_in_title] != 0x00)
-            && (idx_in_title < in_title_id_length)
+    memset(out_title_id, 0x00, out_buffer_size);
+
+    while ( (idx_in_title < in_title_id_length)
+            && (in_title_id[idx_in_title] != 0x00)
             && (idx_out_title < out_buffer_size) ) {
         if ((in_title_id[idx_in_title] == ';') || (in_title_id[idx_in_title] == 0x00)) {
             out_title_id[idx_out_title++] = 0x00;
@@ -293,6 +295,11 @@ void __time_critical_func(game_db_extract_title_id)(const uint8_t* const in_titl
         }
         idx_in_title++;
     }
+
+    if (idx_out_title < out_buffer_size)
+        out_title_id[idx_out_title] = 0x00;
+    else if (out_buffer_size > 0)
+        out_title_id[out_buffer_size - 1] = 0x00;
 }
 
 void game_db_get_current_name(char* const game_name) {

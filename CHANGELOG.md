@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.4.0 - Unreleased
+
+### Features
+
+- Added a USB-CDC command interface for card/channel switching, Game ID selection, PS1/PS2 mode changes, PS2 variant changes, help, and device/bootloader reset commands.
+- Added PS2 card-size handling for larger cards, including 128 MB card creation from settings/GUI and validation for existing images up to 2 GB.
+- Added PS2 MMCEMAN commands for atomic card-and-channel selection and filesystem rename operations.
+- Added PS1 MMCE reset support and direct PS1 MMCE set-card/set-channel handling.
+- Added settings and GUI controls for enabling/disabling PS1 controller combos and limiting the maximum card index per mode.
+- Added SD-root `splash.bin` deployment so a splash image can be imported into flash automatically at boot.
+- Added support for different-sized flash chips to make firmware builds more flexible because of the current chip supply crisis.
+- Added SD-card CID/details to diagnostics and the on-device Info menu.
+- Updated splashgen with a modern simple/advanced UI, histogram preview, Otsu/adaptive thresholding, dithering, input levels, invert output, improved selection behavior, and UF2 validation.
+
+### Fixes
+
+- Fixed PS1 Game2Folder mapping so the mapped folder is not overwritten by the raw parent Game ID.
+- Fixed Game ID, card, and channel edge cases around boot cards, Game ID cards, and card switching.
+- Fixed multiple overflow and bounds risks in Game ID parsing, card configuration parsing, MMCEMAN paths, and filesystem command handling.
+- Fixed stale PS2 data-interface operations and history-tracker slot data during card changes.
+- Fixed invalid PS2 card images causing fatal errors by moving corrupt/invalid images aside and recreating them.
+- Fixed PS2 MagicGate key-select handling to use only the documented low parameter bits.
+- Improved SD write reliability with retries and more useful SD failure diagnostics.
+- Fixed PMC three-button handling and related input initialization issues.
+
+### Changed behavior
+
+- USB-CDC stdio is now enabled for release builds so the serial command interface is available outside debug firmware.
+- Settings serialization now includes `EnableControllerCombo` and `MaxCardIdx`, and settings files are rewritten with truncation to remove stale content.
+- Flash layout is now derived from detected flash capacity, with fallback handling for the legacy splash offset.
+- Card selection now honors configured maximum-card-index limits for PS1 and PS2.
+- Channel up/down behavior on non-GUI builds now clamps at the valid range edge instead of wrapping invisibly.
+- PS2 card formatting now builds the superblock and FAT data dynamically for the selected card size.
+- Imported SD-root `splash.bin` files are removed after successful deployment to flash.
+
 ## 1.3.0 - 2025-11-02
 
 ### Features

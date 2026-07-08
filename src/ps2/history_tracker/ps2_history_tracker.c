@@ -129,13 +129,12 @@ static bool dirExists(char* dirname) {
 
 static void readSlots(uint8_t historyFile[HISTORY_FILE_SIZE], uint8_t slots[HISTORY_ENTRY_COUNT]) {
     for (int i = 0; i < HISTORY_ENTRY_COUNT; i++) {
+        slots[i] = 0x00;
         if (historyFile[i * HISTORY_ENTRY_SIZE]) {
             for (int j = i * HISTORY_ENTRY_SIZE + HISTORY_ENTRY_POS_LAUNCH; j < (i + 1) * HISTORY_ENTRY_SIZE; j++) {
                 slots[i] ^= historyFile[j];
             }
             log(LOG_INFO, "Found game %s with %02x XOR\n", (char*)&historyFile[i * HISTORY_ENTRY_SIZE], historyFile[i * HISTORY_ENTRY_SIZE + HISTORY_ENTRY_POS_LAUNCH]);
-        } else {
-            slots[i] = 0;
         }
     }
 }
